@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from ...core.schemas import InputModel
 from ...db.models import Difficulty, SessionStatus, SkillCategory
+from ..progress.schemas import AchievementOut
 
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]{1,64}$")]
 
@@ -64,6 +65,10 @@ class SessionResultOut(BaseModel):
     level_before: int
     level_after: int
     level_reason: str | None
+    # Celebration details, only in the response to /complete:
+    streak_days: int | None = None
+    new_achievements: list[AchievementOut] = Field(default_factory=list)
+    goals_achieved: list[str] = Field(default_factory=list, description="Titles of goals just met")
 
 
 class SessionGameOut(BaseModel):

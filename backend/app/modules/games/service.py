@@ -33,6 +33,8 @@ from ...db.models import (
     SpeechAttempt,
 )
 from ...providers.speech import SpeechServices
+from ..progress.recorder import record_completed_session
+from ..progress.schemas import AchievementOut
 from .adaptive import DEFAULT_STRATEGY, DifficultyStrategy, LevelDecision, SessionPerformance
 from .content import ContentBank, load_bank
 from .definitions import REGISTRY, GameDefinition, RoundContext
@@ -336,8 +338,25 @@ class GameSessionService:
 
         decision = self._adapt_level(session, definition, rounds)
         session.level_at_end = decision.new_level
+        rewards = record_completed_session(
+            self.db, session, game_slug=definition.slug, settings=self.settings
+        )
         self.db.commit()
-        return self._session_out(session, level_reason=decision.reason)
+        out = self._session_out(session, level_reason=decision.reason)
+        assert out.result is not None  # noqa: S101 - the session is completed
+        out.result.streak_days = rewards.streak_days
+        out.result.new_achievements = [
+            AchievementOut(
+                code=a.code,
+                title=a.title,
+                description=a.description,
+                icon=a.icon,
+                unlocked_at=session.completed_at,
+            )
+            for a in rewards.new_achievements
+        ]
+        out.result.goals_achieved = [g.title for g in rewards.goals_achieved]
+        return out
 
     def abandon(self, session_id: uuid.UUID) -> SessionOut:
         session = self._load(session_id, lock=True)

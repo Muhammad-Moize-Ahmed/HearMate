@@ -158,6 +158,7 @@ def to_child_out(child: Child, viewer: Principal) -> ChildOut:
         preferred_learning_style=child.preferred_learning_style,
         session_length_minutes=child.session_length_minutes,
         notes=None if viewer.is_child else child.notes,
+        timezone=child.timezone,
         login=login,
         created_at=child.created_at,
         updated_at=child.updated_at,

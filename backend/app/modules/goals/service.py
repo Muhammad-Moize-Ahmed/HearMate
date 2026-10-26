@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,7 +29,13 @@ class GoalsService:
 
     def create(self, child_id: uuid.UUID, data: GoalCreateIn) -> Goal:
         child = get_editable_child(self.db, self.principal, child_id)
-        goal = Goal(child_id=child.id, created_by_id=self.principal.id, **data.model_dump())
+        goal = Goal(
+            child_id=child.id,
+            created_by_id=self.principal.id,
+            # App clock, like session completion times: progress counts sessions after this.
+            created_at=datetime.now(UTC),
+            **data.model_dump(),
+        )
         self.db.add(goal)
         self.db.flush()
         self._audit(child, goal, "goal_created")

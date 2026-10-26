@@ -53,6 +53,8 @@ app/
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
     care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
+    progress/        progress, reports and gamification: /api/children/{id}/progress|progress/trend|report|
+                     achievements|personal-bests, /api/family/progress (recorder.py runs on session completion)
     games/           therapy game engine: /api/games, /api/sessions, /api/children/{id}/sessions|levels, /api/speech/status
       definitions/   one file per game + base.py (the contract); REGISTRY maps slug -> game
       content/       bank.json: the curated, versioned word / minimal-pair / sentence / sound bank
@@ -176,3 +178,36 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
   A round passes at 75/100.
 - **Browser fallback:** `GET /api/speech/status` says whether server STT/TTS are set up. A browser transcript can
   still be sent to the normal `/answer` endpoint, and is stored with `provider = "browser"`.
+
+## Progress, reports and gamification
+
+**Recorded on the server when a session completes**, in the same transaction:
+- **daily activity** (sessions, points, time practised) on the child's *local* date;
+- the **streak**;
+- **achievements**;
+- **goal progress**.
+
+The `/complete` response includes `streak_days`, `new_achievements` and `goals_achieved`, so the app can celebrate
+straight away. Abandoned sessions don't count.
+
+- **Local days:** each child has an optional `timezone` (IANA name, set with `PATCH /api/children/{id}`).
+  Without one, `DEFAULT_TIMEZONE` (`Asia/Karachi`) is used, so a game at 11:30 pm counts for that evening.
+- **Streak:** consecutive local days with a completed session. It stays alive until the end of the next day.
+- **Achievements:** 13 badges defined in code (`progress/achievements.py`). They are unlocked once each and based
+  only on the child's own progress (first game, perfect game, level up, 3/7/30-day streaks, every game played,
+  1,000 points, and so on).
+- **Goals:** `current_value` is recomputed (not incremented), so it can't drift. It counts the completed sessions in
+  the goal's skill (or any skill), from the moment the goal was created to the end of its due date. A goal is marked
+  `achieved` when it reaches its target.
+
+| Endpoint (`/api/...`) | Who | What |
+|---|---|---|
+| `children/{id}/progress?days=30` | anyone who can see the child | totals (all time and period), streaks, level + accuracy + trend per skill, recent level changes, active goals |
+| `children/{id}/progress/trend?days=30` | same | one point per local day, for charts |
+| `children/{id}/report?days=30` | parent, linked therapist (audited) | the above, plus per-game results, **accuracy by noise level** (quiet / moderate / loud), **speech sounds to practise**, **hardest minimal-pair contrasts**, level changes |
+| `children/{id}/achievements` | anyone who can see the child | the full badge list, with unlock dates |
+| `children/{id}/personal-bests` | same | best accuracy, points and level per game |
+| `family/progress` | parent, or a child (their siblings) | this week, side by side, siblings only |
+
+**No leaderboards across families:** children compete with their own personal bests, and the only comparison is
+between siblings. Therapist views of progress and reports are written to the audit log.

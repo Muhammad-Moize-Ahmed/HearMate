@@ -3,6 +3,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -53,6 +54,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     LOG_LEVEL: str = "INFO"
+    # Days and streaks follow the child's local calendar; used when a child has no timezone set.
+    DEFAULT_TIMEZONE: str = "Asia/Karachi"
     LOG_FORMAT: LogFormat | None = None
 
     # --- Auth ---
@@ -105,6 +108,15 @@ class Settings(BaseSettings):
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("DEFAULT_TIMEZONE")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:  # the former is a KeyError
+            raise ValueError(f"unknown time zone {value!r}") from exc
         return value
 
     @field_validator("LOG_LEVEL")

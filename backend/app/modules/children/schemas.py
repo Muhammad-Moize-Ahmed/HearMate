@@ -2,6 +2,7 @@ import itertools
 import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
     AfterValidator,
@@ -43,6 +44,14 @@ def _valid_birth_date(value: date) -> date:
     return value
 
 
+def _known_timezone(value: str) -> str:
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError("unknown time zone (use a name like 'Asia/Karachi')") from exc
+    return value
+
+
 def _unique[T](values: list[T]) -> list[T]:
     return list(dict.fromkeys(values))
 
@@ -58,6 +67,7 @@ def _not_trivial_pin(pin: str) -> str:
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 BirthDate = Annotated[date, AfterValidator(_valid_birth_date)]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+TimeZone = Annotated[str, StringConstraints(max_length=64), AfterValidator(_known_timezone)]
 SessionLength = Literal[5, 10, 15, 20, 30]
 Tags = Annotated[list[HearingDifficulty], AfterValidator(_unique)]
 Speech = Annotated[list[SpeechChallenge], AfterValidator(_unique)]
@@ -86,6 +96,7 @@ class ChildCreateIn(InputModel):
     preferred_learning_style: LearningStyle | None = None
     session_length_minutes: SessionLength | None = None
     notes: Notes | None = None
+    timezone: TimeZone | None = None
 
 
 class ChildUpdateIn(InputModel):
@@ -104,6 +115,7 @@ class ChildUpdateIn(InputModel):
     preferred_learning_style: LearningStyle | None = None
     session_length_minutes: SessionLength | None = None
     notes: Notes | None = None
+    timezone: TimeZone | None = None
 
     @model_validator(mode="after")
     def _required_fields_cannot_be_cleared(self) -> Self:
@@ -147,6 +159,7 @@ class ChildOut(BaseModel):
     preferred_learning_style: str | None
     session_length_minutes: int | None
     notes: str | None = Field(description="Hidden from the child themselves")
+    timezone: str | None = Field(description="Null means the server default")
     login: ChildLoginOut | None = Field(
         description="Child sign-in details; only shown to the parent"
     )

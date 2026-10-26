@@ -16,8 +16,9 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 3 | Children, goals, therapist linking (backend) | ✅ done |
 | 4 | Therapy game engine (backend): 5 games, adaptive levels, server-side scoring | ✅ done |
 | 5 | Speech services: Whisper STT, Piper TTS, server-rendered audio, pronunciation scoring | ✅ done |
-| 6 | Progress, reports and gamification | ⏳ next |
-| 7–9 | Frontend, PWA/offline, deploy | planned |
+| 6 | Progress, reports and gamification: streaks, achievements, goals, parent/therapist reports | ✅ done |
+| 7 | Frontend | ⏳ next |
+| 8–9 | PWA/offline, deploy | planned |
 
 ## Tech stack
 

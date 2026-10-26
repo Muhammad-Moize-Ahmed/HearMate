@@ -47,3 +47,5 @@ class Child(UUIDPrimaryKeyMixin, LoginLockoutMixin, TimestampMixin, Base):
     preferred_learning_style: Mapped[str | None] = mapped_column(String(50))
     session_length_minutes: Mapped[int | None] = mapped_column(SmallInteger)
     notes: Mapped[str | None] = mapped_column(Text)
+    # IANA name (e.g. "Asia/Karachi"); None means the server's DEFAULT_TIMEZONE.
+    timezone: Mapped[str | None] = mapped_column(String(64))

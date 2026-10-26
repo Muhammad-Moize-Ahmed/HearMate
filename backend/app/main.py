@@ -19,6 +19,7 @@ from .modules.games.router import (
 )
 from .modules.goals.router import router as goals_router
 from .modules.health.router import router as health_router
+from .modules.progress.router import family_router, progress_router
 from .providers.email import build_email_sender
 from .providers.speech import build_speech_services
 
@@ -64,6 +65,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(sessions_router)
     api.include_router(child_progress_router)
     api.include_router(speech_router)
+    api.include_router(progress_router)
+    api.include_router(family_router)
     app.include_router(api)
 
     return app
