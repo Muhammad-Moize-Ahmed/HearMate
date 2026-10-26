@@ -39,8 +39,8 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "S", "RUF"]
 known-third-party = ["alembic"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests use obvious dummy credentials ("pw", "x") and assert statements.
-"tests/**" = ["S101", "S105", "S106"]
+# Tests use asserts, obvious dummy credentials ("pw", "x") and seeded (non-crypto) randomness.
+"tests/**" = ["S101", "S105", "S106", "S311"]
 
 [tool.mypy]
 python_version = "3.12"

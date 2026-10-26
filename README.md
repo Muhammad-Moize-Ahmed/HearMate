@@ -14,8 +14,9 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 1 | Backend core: config, DB models, migrations, logging, error format, health checks | ✅ done |
 | 2 | Authentication and role-based access (backend) | ✅ done |
 | 3 | Children, goals, therapist linking (backend) | ✅ done |
-| 4 | Therapy game engine | ⏳ next |
-| 5–9 | Speech, progress, frontend, PWA/offline, deploy | planned |
+| 4 | Therapy game engine (backend): 5 games, adaptive levels, server-side scoring | ✅ done |
+| 5 | Speech services (STT, TTS, server audio) | ⏳ next |
+| 6–9 | Progress, frontend, PWA/offline, deploy | planned |
 
 ## Tech stack
 
@@ -55,6 +56,7 @@ docker compose ps                # wait until "healthy"
 cd backend
 uv sync
 uv run alembic upgrade head      # create/upgrade the schema
+uv run python -m app.cli sync-games   # load the game catalogue
 uv run python -m app.cli create-admin --email you@example.com   # optional: first admin
 uv run uvicorn app.main:app --reload   # in dev, emailed codes are printed in this log
 

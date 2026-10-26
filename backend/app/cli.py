@@ -1,4 +1,8 @@
-"""Operator commands. Usage: uv run python -m app.cli create-admin --email admin@example.com"""
+"""Operator commands, e.g.:
+
+uv run python -m app.cli create-admin --email admin@example.com
+uv run python -m app.cli sync-games
+"""
 
 import argparse
 import getpass
@@ -11,6 +15,7 @@ from .auth.passwords import hash_secret
 from .db.models import User, UserRole
 from .db.session import get_sessionmaker
 from .modules.auth.schemas import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
+from .modules.games.catalogue import sync_games
 
 
 def create_admin(email: str, first_name: str, last_name: str) -> int:
@@ -42,6 +47,20 @@ def create_admin(email: str, first_name: str, last_name: str) -> int:
     return 0
 
 
+def sync_games_command() -> int:
+    with get_sessionmaker()() as db:
+        report = sync_games(db)
+    for label, slugs in (
+        ("created", report.created),
+        ("updated", report.updated),
+        ("deactivated", report.deactivated),
+    ):
+        if slugs:
+            print(f"{label}: {', '.join(slugs)}")
+    print("Games are in sync with the registry.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -52,9 +71,13 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--first-name", default="Admin")
     admin.add_argument("--last-name", default="User")
 
+    commands.add_parser("sync-games", help="Create/update the games table from the code registry")
+
     args = parser.parse_args(argv)
     if args.command == "create-admin":
         return create_admin(args.email, args.first_name, args.last_name)
+    if args.command == "sync-games":
+        return sync_games_command()
     return 2
 
 

@@ -10,6 +10,7 @@ uv run pytest                             # all tests (DB tests use a separate <
 uv run pytest -m "not db"                 # only tests that don't need PostgreSQL
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python -m app.cli create-admin --email you@example.com   # prompts for a password
+uv run python -m app.cli sync-games       # create/update the games table from the code registry
 ```
 
 ## Layout
@@ -46,6 +47,10 @@ app/
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
     care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
+    games/           therapy game engine: /api/games, /api/sessions, /api/children/{id}/sessions|levels, /api/audio/noise
+      definitions/   one file per game + base.py (the contract); REGISTRY maps slug -> game
+      content/       bank.json: the curated, versioned word / minimal-pair / sentence / sound bank
+      adaptive.py    level rules (DifficultyStrategy); levels.py, scoring.py, noise.py, catalogue.py
 alembic/             migrations; versions/ starts from a single baseline
 tests/               unit tests; tests/db/ needs PostgreSQL
 ```
@@ -98,3 +103,41 @@ tests/               unit tests; tests/db/ needs PostgreSQL
   with obvious ones (1111, 1234, 9876) refused. Changing or removing the login signs the child out everywhere.
 - **Goal progress** (`current_value`) is read-only here; it will be computed from game sessions in Phase 6.
 - **Deleting a child** permanently removes their sessions, goals, links and progress (database cascade).
+
+## Therapy game engine
+
+**The server owns every session.** `POST /api/sessions {child_id, game}` picks the child's level and
+builds every round; the client then sends each **answer** (`{"choice": ...}`, `{"sequence": [...]}` or
+`{"transcript": ...}`) to `/rounds/{i}/answer`, and the server says whether it was right. `POST .../complete`
+totals accuracy and points and moves the level. Clients never send scores (unknown fields are rejected).
+
+| Game (`slug`) | Skill | What changes with level (1-9) |
+|---|---|---|
+| `sound-detective` | listening | 2 -> 6 picture options; from level 5 the wrong options are the same kind of sound |
+| `similar-sounds` | listening | minimal pairs: easy (cat/hat), medium voicing (pea/bee), hard vowels (bit/beat/bat/bet) |
+| `word-sequence` | memory | 2 -> 6 words to repeat in order (partial credit is reported, only exact order counts) |
+| `listening-in-noise` | listening | signal-to-noise ratio 20 dB -> 2 dB; white noise, then pink |
+| `speech-practice` | speech | short words -> longer words -> sentences; transcript scored 0-100, pass at 75 |
+
+- **Levels:** one per child per skill (listening, speech, memory). Tiers: 1-3 easy, 4-6 medium, 7-9 hard.
+- **Adaptive rule** (`RollingThresholdStrategy`): looking at up to the last 3 completed sessions *at the
+  current level*: level up when this session and the average are both >= 80% (unless answers were much
+  slower than the game's expected time), level down when both are < 60%, otherwise stay. Every change is
+  stored in `level_history` with a plain-English reason. Swap the strategy by implementing `DifficultyStrategy`.
+- **Points:** 10 per correct round (+10 for a perfect session), x1 / x2 / x3 for easy / medium / hard.
+- **One active session per child:** starting a new game abandons an unfinished one. Abandoned sessions
+  don't affect levels.
+- **Adding a game:** write a `GameDefinition` in `definitions/`, add it to `REGISTRY`, then run
+  `python -m app.cli sync-games`.
+- **Content:** edit `content/bank.json` (validated on load; bump `version`). Rounds store the exact item
+  they used, so bank edits never change past sessions.
+- **Noise:** rounds include `{"kind", "snr_db", "url"}`. `/api/audio/noise/{white|pink}.wav` is generated
+  at -20 dBFS; play the stimulus at the same level and the noise at gain `10^(-snr_db/20)`.
+
+**Not yet (by design, later phases):**
+- **Stimulus audio:** rounds name the stimulus (`text` or `sound_id`). Until Phase 5 serves audio from the server,
+  a browser can read the answer from the prompt. Scores are still only computed server-side.
+- **Sound effect files:** these are still needed. The old app's MP3s have unknown licences, so they were not copied.
+- **Speech Practice transcripts** come from the browser for now (`provider = "browser"` in `speech_attempts`).
+  Phase 5 adds server speech-to-text.
+- **LLM-generated extra content:** not implemented. The bank is the only source.
