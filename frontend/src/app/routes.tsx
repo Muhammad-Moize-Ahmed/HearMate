@@ -5,7 +5,10 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { SignupPage } from '../features/auth/SignupPage';
 import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
-import { AdminHome, ChildHome, ParentHome, TherapistHome } from '../features/home/HomePages';
+import { EditChildPage, NewChildPage } from '../features/children/ChildFormPages';
+import { ChildPage } from '../features/children/ChildPage';
+import { ParentDashboard } from '../features/children/ParentDashboard';
+import { AdminHome, ChildHome, TherapistHome } from '../features/home/HomePages';
 import { LandingPage } from '../features/landing/LandingPage';
 import { NotFoundPage } from '../features/landing/NotFoundPage';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -39,7 +42,12 @@ export const routes: RouteObject[] = [
       {
         path: 'parent',
         element: <RoleLayout roleLabel="Parent" badgeClass="bg-sun-200" home="/parent" />,
-        children: [{ index: true, element: <ParentHome /> }],
+        children: [
+          { index: true, element: <ParentDashboard /> },
+          { path: 'children/new', element: <NewChildPage /> },
+          { path: 'children/:childId', element: <ChildPage /> },
+          { path: 'children/:childId/edit', element: <EditChildPage /> },
+        ],
       },
     ],
   },

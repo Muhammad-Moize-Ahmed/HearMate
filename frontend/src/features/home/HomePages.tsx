@@ -13,26 +13,6 @@ function Greeting({ name, children }: { name: string; children: ReactNode }) {
   );
 }
 
-export function ParentHome() {
-  const principal = usePrincipal();
-  const name = principal.kind === 'child' ? principal.display_name : principal.first_name;
-  return (
-    <>
-      <Greeting name={name}>
-        Here's where you'll follow your children's listening practice.
-      </Greeting>
-      <ComingSoon
-        features={[
-          { emoji: '🧒', title: 'Your children', text: 'Add profiles and set up their sign-in.' },
-          { emoji: '📈', title: 'Progress', text: 'See streaks, levels and what to practise.' },
-          { emoji: '🎯', title: 'Goals', text: 'Set weekly targets and celebrate wins.' },
-          { emoji: '🩺', title: 'Care team', text: "Invite your child's therapist." },
-        ]}
-      />
-    </>
-  );
-}
-
 export function TherapistHome() {
   const principal = usePrincipal();
   if (principal.kind === 'child') return null;

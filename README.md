@@ -18,7 +18,8 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 5 | Speech services: Whisper STT, Piper TTS, server-rendered audio, pronunciation scoring | ✅ done |
 | 6 | Progress, reports and gamification: streaks, achievements, goals, parent/therapist reports | ✅ done |
 | 7a | Frontend foundations (router, API types, role layouts, guards) and sign-in screens | ✅ done |
-| 7b+ | Frontend: dashboards, children, games, reports | ⏳ next |
+| 7b | Parent dashboard, child profiles and sign-in (username + PIN), goals | ✅ done |
+| 7c+ | Frontend: games, progress reports, care team, therapist and admin screens | ⏳ next |
 | 8–9 | PWA/offline, deploy | planned |
 
 ## Tech stack
@@ -96,9 +97,12 @@ src/
   app/               routes.tsx (every screen, with guards), layouts/ (auth, parent/therapist/admin, child), query client
   api/               generated schema, `api` (authenticated) and `publicApi` (sign-in) clients, ApiError
   auth/              session (in-memory tokens + refresh), AuthProvider, route guards, post-sign-in redirects
-  features/          auth/ (login, sign up, verify email, forgot password), home/ (role home pages), landing/
-  components/ui/     Button, TextField/PasswordField, Alert, CodeInput, PinPad, Logo, Spinner
-  test/              mockApi (fake backend for tests), renderApp (real routes in memory)
+  features/          auth/ (login, sign up, verify email, forgot password), children/ (parent dashboard,
+                     child form, child page, child sign-in), goals/, home/ (other role homes), landing/
+  components/ui/     Button/LinkButton, TextField/PasswordField, fields (select, textarea, chips, segmented),
+                     Alert, ConfirmDialog, ProgressBar, CodeInput, PinPad, Logo, Spinner
+  lib/               avatars, dates (date-only values), useCooldown
+  test/              mockApi (fake backend for tests), fixtures (a signed-in parent with a child), renderApp
 ```
 
 | Path | Who | |
@@ -107,13 +111,20 @@ src/
 | `/login` (`?as=child` / `?as=therapist`) | signed out | tabs: parent (email + password), child (name + PIN pad), therapist |
 | `/signup` (`?role=therapist`) | signed out | parent or therapist account |
 | `/verify-email`, `/forgot-password` | signed out | 6-digit emailed codes |
-| `/parent`, `/therapist`, `/admin`, `/play` | that kind of account only | role areas (home pages for now) |
+| `/parent` | parents | dashboard: each child's week (games, minutes, streak) and sign-in status |
+| `/parent/children/new`, `/parent/children/:id/edit` | parents | child profile form |
+| `/parent/children/:id` | parents | the child's week, sign-in (username + PIN), goals, profile, delete |
+| `/therapist`, `/admin`, `/play` | that kind of account only | role areas (home pages for now) |
 
 - **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
   httpOnly cookie restores the sign-in. Because the backend ends the whole sign-in if a refresh token is used twice,
   refreshes never overlap: one request per tab, and tabs take turns through a Web Lock.
 - **Guards:** a signed-out visitor is sent to sign in and then back to the page they asked for. An account that opens
   another role's area is sent to its own. Signed-in users skip the sign-in screens.
+- **Children and goals:** forms check the same rules as the backend (e.g. PINs like 1111 or 1234 are refused
+  before they're sent). Goal edits send only the fields that changed, so an already-passed due date is kept.
+  Deleting a child, removing their sign-in or deleting a goal asks for confirmation. Deleting a child also asks
+  you to type their name.
 - **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
   for PINs, emoji avatars, and animations switched off under "reduce motion".
 

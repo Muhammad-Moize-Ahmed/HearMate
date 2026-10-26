@@ -62,11 +62,11 @@ export function PasswordField(props: Omit<TextFieldProps, 'type' | 'trailing'>) 
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
-          aria-pressed={visible}
+          // An explicit label: text split across elements loses its space ("Showpassword").
+          aria-label={visible ? 'Hide password' : 'Show password'}
           className="min-h-9 rounded-xl px-3 text-sm font-bold text-brand-700 hover:bg-brand-100"
         >
           {visible ? 'Hide' : 'Show'}
-          <span className="sr-only"> password</span>
         </button>
       }
     />

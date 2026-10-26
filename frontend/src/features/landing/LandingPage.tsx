@@ -1,13 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
 
 import { publicApi, unwrap } from '../../api/client';
 import { useAuth } from '../../auth/context';
 import { homePath } from '../../auth/routing';
+import { LinkButton } from '../../components/ui/Button';
 import { Logo } from '../../components/ui/Logo';
-
-const LINK_BUTTON =
-  'inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold transition';
 
 export function LandingPage() {
   const auth = useAuth();
@@ -25,33 +22,21 @@ export function LandingPage() {
       </div>
 
       {auth.status === 'signed-in' ? (
-        <Link
-          to={homePath(auth.principal.kind)}
-          className={`${LINK_BUTTON} bg-brand-600 text-white shadow-[0_4px_0_var(--color-brand-800)] hover:bg-brand-700`}
-        >
+        <LinkButton to={homePath(auth.principal.kind)} size="lg">
           Go to my space
-        </Link>
+        </LinkButton>
       ) : (
         <div className="flex w-full flex-col gap-3 sm:w-auto">
-          <Link
-            to="/login?as=child"
-            className={`${LINK_BUTTON} min-h-16 bg-sun-300 text-xl text-ink shadow-[0_4px_0_#ca8a04] hover:bg-sun-200`}
-          >
+          <LinkButton to="/login?as=child" variant="sunny" size="xl">
             <span aria-hidden="true">🎧</span> I'm a kid, let's play!
-          </Link>
+          </LinkButton>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link
-              to="/login"
-              className={`${LINK_BUTTON} bg-brand-600 text-white shadow-[0_4px_0_var(--color-brand-800)] hover:bg-brand-700`}
-            >
+            <LinkButton to="/login" size="lg">
               Sign in
-            </Link>
-            <Link
-              to="/signup"
-              className={`${LINK_BUTTON} bg-white text-brand-700 ring-2 ring-brand-200 hover:bg-brand-50`}
-            >
+            </LinkButton>
+            <LinkButton to="/signup" variant="secondary" size="lg">
               Create an account
-            </Link>
+            </LinkButton>
           </div>
         </div>
       )}

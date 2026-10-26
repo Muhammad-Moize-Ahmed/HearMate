@@ -41,6 +41,17 @@ describe('Login', () => {
     expect(api.callsTo('POST /api/auth/login')).toHaveLength(0);
   });
 
+  it('can show the password while typing it', async () => {
+    mockApi({});
+    const { user } = renderApp('/login');
+
+    await user.click(await screen.findByRole('button', { name: 'Show password' }));
+
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+  });
+
   it('signs a parent in', async () => {
     const api = mockApi({ 'POST /api/auth/login': { body: tokenFor(PARENT) } });
     const { user, router } = renderApp('/login');
