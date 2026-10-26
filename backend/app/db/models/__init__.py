@@ -4,6 +4,7 @@ from .audit import AuditLog
 from .children import Child
 from .enums import (
     ActorType,
+    CodePurpose,
     Difficulty,
     Gender,
     GoalStatus,
@@ -24,13 +25,14 @@ from .therapists import (
     TherapistNote,
     TherapistProfile,
 )
-from .users import RefreshToken, User
+from .users import OneTimeCode, RefreshToken, User
 
 __all__ = [
     "Achievement",
     "ActorType",
     "AuditLog",
     "Child",
+    "CodePurpose",
     "DailyActivity",
     "Difficulty",
     "Game",
@@ -41,6 +43,7 @@ __all__ = [
     "LearningPlan",
     "LearningPlanItem",
     "LevelHistory",
+    "OneTimeCode",
     "RefreshToken",
     "SessionRound",
     "SessionStatus",

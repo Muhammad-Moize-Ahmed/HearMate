@@ -59,3 +59,8 @@ class ActorType(StrEnum):
     USER = "user"
     CHILD = "child"
     SYSTEM = "system"
+
+
+class CodePurpose(StrEnum):
+    VERIFY_EMAIL = "verify_email"
+    RESET_PASSWORD = "reset_password"  # noqa: S105 - enum name, not a secret

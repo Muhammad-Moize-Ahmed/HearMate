@@ -1,11 +1,15 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth.rate_limit import RateLimiter
 from .core.config import Settings, get_settings
 from .core.errors import register_error_handlers
 from .core.logging import configure_logging
 from .core.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
+from .modules.admin.router import router as admin_router
+from .modules.auth.router import router as auth_router
 from .modules.health.router import router as health_router
+from .providers.email import build_email_sender
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,6 +24,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url=f"{prefix}/docs",
         redoc_url=None,
     )
+    app.state.settings = settings
+    app.state.rate_limiter = RateLimiter()
+    app.state.email_sender = build_email_sender(settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -35,6 +42,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     api = APIRouter(prefix=prefix)
     api.include_router(health_router)
+    api.include_router(auth_router)
+    api.include_router(admin_router)
     app.include_router(api)
 
     return app

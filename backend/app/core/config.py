@@ -52,6 +52,31 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: LogFormat | None = None
 
+    # --- Auth ---
+    ACCESS_TOKEN_TTL_MINUTES: int = Field(default=15, ge=1, le=60)
+    REFRESH_TOKEN_TTL_DAYS: int = Field(default=14, ge=1, le=90)
+    # One-time codes (email verification, password reset)
+    OTP_TTL_MINUTES: int = Field(default=15, ge=1, le=60)
+    OTP_MAX_ATTEMPTS: int = Field(default=5, ge=1)
+    OTP_RESEND_COOLDOWN_SECONDS: int = Field(default=60, ge=0)
+    # Lock a parent/therapist/admin or child account after this many wrong passwords/PINs in a row.
+    LOGIN_MAX_FAILURES: int = Field(default=5, ge=1)
+    LOGIN_LOCKOUT_MINUTES: int = Field(default=15, ge=1)
+    # Refresh-token cookie. Use SameSite=none (with Secure) only if frontend and API are on
+    # different sites; the default suits the Vite proxy and a same-site deployment.
+    REFRESH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+    REFRESH_COOKIE_SECURE: bool | None = None
+
+    # --- Email ---
+    # "console" logs emails (development only); "smtp" sends them.
+    EMAIL_BACKEND: Literal["console", "smtp"] = "console"
+    EMAIL_FROM: str = "HearMate <no-reply@hearmate.local>"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: SecretStr | None = None
+    SMTP_STARTTLS: bool = True
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -79,11 +104,21 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL or POSTGRES_PASSWORD must be set in production")
         if "*" in self.CORS_ORIGINS:
             raise ValueError("CORS_ORIGINS must list explicit origins in production, not '*'")
+        if self.EMAIL_BACKEND != "smtp" or not self.SMTP_HOST:
+            raise ValueError("EMAIL_BACKEND=smtp and SMTP_HOST are required in production")
+        if self.REFRESH_COOKIE_SECURE is False:
+            raise ValueError("REFRESH_COOKIE_SECURE cannot be false in production")
         return self
 
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+    @property
+    def refresh_cookie_secure(self) -> bool:
+        if self.REFRESH_COOKIE_SECURE is not None:
+            return self.REFRESH_COOKIE_SECURE
+        return self.is_production or self.REFRESH_COOKIE_SAMESITE == "none"
 
     @property
     def log_format(self) -> LogFormat:

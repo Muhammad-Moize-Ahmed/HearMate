@@ -7,9 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, TimestampMixin, UUIDPrimaryKeyMixin, str_enum
 from .enums import Gender
+from .users import LoginLockoutMixin
 
 
-class Child(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Child(UUIDPrimaryKeyMixin, LoginLockoutMixin, TimestampMixin, Base):
     __tablename__ = "children"
     __table_args__ = (
         # A child can log in only if the parent set both a username and a PIN.

@@ -20,11 +20,23 @@ class AppError(Exception):
 
     status_code: int = HTTPStatus.BAD_REQUEST
     code: str = "bad_request"
+    headers: dict[str, str] | None = None
 
-    def __init__(self, message: str, *, details: Any = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        details: Any = None,
+        code: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        if code is not None:
+            self.code = code
+        if headers is not None:
+            self.headers = headers
 
 
 class NotFoundError(AppError):
@@ -41,10 +53,26 @@ class AuthenticationError(AppError):
     status_code = HTTPStatus.UNAUTHORIZED
     code = "unauthenticated"
 
+    def __init__(self, message: str = "Not authenticated", *, code: str | None = None) -> None:
+        super().__init__(message, code=code, headers={"WWW-Authenticate": "Bearer"})
+
 
 class PermissionDeniedError(AppError):
     status_code = HTTPStatus.FORBIDDEN
     code = "forbidden"
+
+
+class RateLimitedError(AppError):
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+    code = "rate_limited"
+
+    def __init__(self, message: str, *, retry_after_seconds: int, code: str | None = None) -> None:
+        super().__init__(
+            message,
+            code=code,
+            details={"retry_after_seconds": retry_after_seconds},
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
 
 
 def error_response(
@@ -69,7 +97,7 @@ def _code_for_status(status_code: int) -> str:
 
 async def _handle_app_error(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)  # noqa: S101 - narrowing for the type checker
-    return error_response(exc.status_code, exc.code, exc.message, exc.details)
+    return error_response(exc.status_code, exc.code, exc.message, exc.details, exc.headers)
 
 
 async def _handle_http_exception(_: Request, exc: Exception) -> JSONResponse:

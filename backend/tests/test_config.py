@@ -4,6 +4,12 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 STRONG_SECRET = "x" * 48
+PRODUCTION_BASE: dict[str, object] = {
+    "ENVIRONMENT": "production",
+    "POSTGRES_PASSWORD": "pw",
+    "EMAIL_BACKEND": "smtp",
+    "SMTP_HOST": "smtp.example.com",
+}
 
 
 def make_settings(**values: object) -> Settings:
@@ -58,24 +64,31 @@ def test_cors_origins_accepts_a_comma_separated_env_var(monkeypatch: pytest.Monk
         ({"SECRET_KEY": "too-short"}, "SECRET_KEY"),
         ({"SECRET_KEY": STRONG_SECRET, "POSTGRES_PASSWORD": None}, "POSTGRES_PASSWORD"),
         ({"SECRET_KEY": STRONG_SECRET, "CORS_ORIGINS": "*"}, "CORS_ORIGINS"),
+        ({"SECRET_KEY": STRONG_SECRET, "EMAIL_BACKEND": "console"}, "EMAIL_BACKEND"),
+        ({"SECRET_KEY": STRONG_SECRET, "SMTP_HOST": None}, "SMTP_HOST"),
+        ({"SECRET_KEY": STRONG_SECRET, "REFRESH_COOKIE_SECURE": False}, "REFRESH_COOKIE_SECURE"),
     ],
 )
 def test_production_refuses_unsafe_configuration(
     overrides: dict[str, object], message: str
 ) -> None:
-    values: dict[str, object] = {"ENVIRONMENT": "production", "POSTGRES_PASSWORD": "pw"}
+    values: dict[str, object] = PRODUCTION_BASE
 
     with pytest.raises(ValidationError, match=message):
         make_settings(**(values | overrides))
 
 
 def test_production_accepts_a_safe_configuration() -> None:
-    settings = make_settings(
-        ENVIRONMENT="production", SECRET_KEY=STRONG_SECRET, POSTGRES_PASSWORD="pw"
-    )
+    settings = make_settings(**(PRODUCTION_BASE | {"SECRET_KEY": STRONG_SECRET}))
 
     assert settings.secret_key() == STRONG_SECRET
     assert settings.log_format == "json"
+    assert settings.refresh_cookie_secure is True
+
+
+def test_refresh_cookie_is_secure_whenever_samesite_is_none() -> None:
+    assert make_settings(REFRESH_COOKIE_SAMESITE="none").refresh_cookie_secure is True
+    assert make_settings(REFRESH_COOKIE_SAMESITE="lax").refresh_cookie_secure is False
 
 
 def test_development_generates_one_stable_secret_when_unset() -> None:

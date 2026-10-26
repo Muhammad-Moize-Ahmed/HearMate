@@ -12,8 +12,9 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 |---|---|---|
 | 0 | Repo foundation: layout, tooling, CI, local Postgres | ✅ done |
 | 1 | Backend core: config, DB models, migrations, logging, error format, health checks | ✅ done |
-| 2 | Authentication and role-based access | ⏳ next |
-| 3–9 | Children & therapists, game engine, speech, progress, frontend, PWA/offline, deploy | planned |
+| 2 | Authentication and role-based access (backend) | ✅ done |
+| 3 | Children, goals, therapist linking | ⏳ next |
+| 4–9 | Game engine, speech, progress, frontend, PWA/offline, deploy | planned |
 
 ## Tech stack
 
@@ -53,7 +54,8 @@ docker compose ps                # wait until "healthy"
 cd backend
 uv sync
 uv run alembic upgrade head      # create/upgrade the schema
-uv run uvicorn app.main:app --reload
+uv run python -m app.cli create-admin --email you@example.com   # optional: first admin
+uv run uvicorn app.main:app --reload   # in dev, emailed codes are printed in this log
 
 # 4. Frontend: http://localhost:5173 (in a second terminal)
 cd frontend

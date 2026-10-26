@@ -1,14 +1,21 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, func
+from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, TimestampMixin, UUIDPrimaryKeyMixin, str_enum, timestamptz
-from .enums import UserRole, UserStatus
+from .enums import CodePurpose, UserRole, UserStatus
 
 
-class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class LoginLockoutMixin:
+    """Consecutive failed logins; the account is locked until `locked_until` after too many."""
+
+    failed_login_count: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(timestamptz())
+
+
+class User(UUIDPrimaryKeyMixin, LoginLockoutMixin, TimestampMixin, Base):
     """An adult account: parent, therapist or admin. Children are separate principals."""
 
     __tablename__ = "users"
@@ -48,4 +55,25 @@ class RefreshToken(UUIDPrimaryKeyMixin, Base):
     family_id: Mapped[uuid.UUID]
     expires_at: Mapped[datetime] = mapped_column(timestamptz())
     revoked_at: Mapped[datetime | None] = mapped_column(timestamptz())
+    created_at: Mapped[datetime] = mapped_column(timestamptz(), server_default=func.now())
+
+
+class OneTimeCode(UUIDPrimaryKeyMixin, Base):
+    """A short emailed code (verify email, reset password). Only an HMAC of the code is stored.
+
+    Issuing a new code consumes older unused ones for the same user and purpose.
+    """
+
+    __tablename__ = "one_time_codes"
+    __table_args__ = (
+        Index("ix_one_time_codes_user_purpose", "user_id", "purpose", "created_at"),
+        CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    purpose: Mapped[CodePurpose] = mapped_column(str_enum(CodePurpose, "code_purpose"))
+    code_hash: Mapped[str] = mapped_column(String(128))
+    attempts: Mapped[int] = mapped_column(SmallInteger, default=0)
+    expires_at: Mapped[datetime] = mapped_column(timestamptz())
+    consumed_at: Mapped[datetime | None] = mapped_column(timestamptz())
     created_at: Mapped[datetime] = mapped_column(timestamptz(), server_default=func.now())

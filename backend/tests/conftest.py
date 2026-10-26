@@ -12,12 +12,14 @@ from sqlalchemy.orm import Session
 from app.core.config import BACKEND_DIR, Settings, get_settings
 from app.db.session import get_db
 from app.main import create_app
+from tests.fakes import RecordingEmailSender
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     # Everything under tests/db/ needs PostgreSQL (docker compose up -d db).
+    tests_dir = Path(__file__).parent
     for item in items:
-        if Path(item.path).parent.name == "db":
+        if Path(item.path).relative_to(tests_dir).parts[0] == "db":
             item.add_marker(pytest.mark.db)
 
 
@@ -89,8 +91,15 @@ def db_session(migrated_engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def app(test_settings: Settings) -> FastAPI:
-    return create_app(test_settings)
+def mailbox() -> RecordingEmailSender:
+    return RecordingEmailSender()
+
+
+@pytest.fixture
+def app(test_settings: Settings, mailbox: RecordingEmailSender) -> FastAPI:
+    app = create_app(test_settings)
+    app.state.email_sender = mailbox
+    return app
 
 
 @pytest.fixture
