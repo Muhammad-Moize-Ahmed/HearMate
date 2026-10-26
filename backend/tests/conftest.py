@@ -16,7 +16,9 @@ from app.core.config import BACKEND_DIR, Settings, get_settings
 from app.db.models import Child, User
 from app.db.session import get_db
 from app.main import create_app
-from tests.fakes import RecordingEmailSender
+from app.providers.speech import SpeechServices
+from app.providers.speech.cache import TtsCache
+from tests.fakes import FakeStt, FakeTts, RecordingEmailSender
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -100,9 +102,28 @@ def mailbox() -> RecordingEmailSender:
 
 
 @pytest.fixture
-def app(test_settings: Settings, mailbox: RecordingEmailSender) -> FastAPI:
+def fake_stt() -> FakeStt:
+    return FakeStt()
+
+
+@pytest.fixture
+def fake_tts() -> FakeTts:
+    return FakeTts()
+
+
+@pytest.fixture
+def speech(fake_stt: FakeStt, fake_tts: FakeTts, tmp_path: Path) -> SpeechServices:
+    """Fake STT/TTS (no models needed); real ffmpeg decoding, caching and mixing."""
+    return SpeechServices(
+        stt=fake_stt, tts=fake_tts, cache=TtsCache(tmp_path / "tts"), max_seconds=15.0
+    )
+
+
+@pytest.fixture
+def app(test_settings: Settings, mailbox: RecordingEmailSender, speech: SpeechServices) -> FastAPI:
     app = create_app(test_settings)
     app.state.email_sender = mailbox
+    app.state.speech = speech
     return app
 
 

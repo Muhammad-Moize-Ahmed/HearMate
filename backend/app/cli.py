@@ -12,10 +12,16 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from .auth.passwords import hash_secret
+from .core.config import get_settings
 from .db.models import User, UserRole
 from .db.session import get_sessionmaker
 from .modules.auth.schemas import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from .modules.games.catalogue import sync_games
+from .modules.games.pronunciation import score_pronunciation
+from .providers.speech import build_speech_services
+from .providers.speech.audio import to_wav
+from .providers.speech.piper_tts import PiperTts
+from .providers.speech.whisper import WhisperStt
 
 
 def create_admin(email: str, first_name: str, last_name: str) -> int:
@@ -61,6 +67,31 @@ def sync_games_command() -> int:
     return 0
 
 
+def speech_setup_command() -> int:
+    """Download the configured speech models (outside the repo) and run a round-trip check."""
+    settings = get_settings()
+    speech = build_speech_services(settings)
+
+    if isinstance(speech.tts, PiperTts):
+        if speech.tts.available():
+            print(f"Piper voice already present: {speech.tts.model_path}")
+        else:
+            print(f"Downloading Piper voice {settings.PIPER_VOICE} to {speech.tts.voice_dir} ...")
+            print(f"Saved {speech.tts.download()}")
+    if isinstance(speech.stt, WhisperStt):
+        print(f"Loading Whisper model {settings.WHISPER_MODEL} (downloads on first run) ...")
+        speech.stt.load()
+
+    if speech.tts is None or speech.stt is None:
+        print("TTS or STT is turned off; skipping the round-trip check.")
+        return 0
+    sentence = "The cat is sleeping."
+    transcription, _clip = speech.transcribe(to_wav(speech.speak(sentence)))
+    result = score_pronunciation(sentence, transcription.text)
+    print(f"Round trip: said {sentence!r}, heard {transcription.text!r}, score {result.score}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -72,12 +103,17 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--last-name", default="User")
 
     commands.add_parser("sync-games", help="Create/update the games table from the code registry")
+    commands.add_parser(
+        "speech-setup", help="Download speech models (outside the repo) and self-test them"
+    )
 
     args = parser.parse_args(argv)
     if args.command == "create-admin":
         return create_admin(args.email, args.first_name, args.last_name)
     if args.command == "sync-games":
         return sync_games_command()
+    if args.command == "speech-setup":
+        return speech_setup_command()
     return 2
 
 

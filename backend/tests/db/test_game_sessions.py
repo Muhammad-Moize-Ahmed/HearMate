@@ -1,5 +1,3 @@
-import io
-import wave
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -183,8 +181,12 @@ def test_listening_in_noise_always_has_noise(
     session = start(db_client, headers, child, "listening-in-noise")
 
     assert session["with_noise"] is True
-    noise = session["rounds"][0]["prompt"]["noise"]
-    assert noise == {"kind": "white", "snr_db": 20.0, "url": "/api/audio/noise/white.wav"}
+    prompt = session["rounds"][0]["prompt"]
+    assert prompt["noise"] == {"kind": "white", "snr_db": 20.0}  # mixed in by the server
+    assert prompt["stimulus"] == {
+        "type": "speech",
+        "audio_url": f"/api/sessions/{session['id']}/rounds/0/stimulus",
+    }
 
 
 def test_games_without_noise_refuse_it(
@@ -505,16 +507,15 @@ def test_long_idle_sessions_cap_their_duration(
     assert done["result"]["duration_seconds"] == 2 * 60 * 60
 
 
-def test_speech_practice_scores_transcripts_and_keeps_attempts(
+def test_speech_practice_accepts_a_browser_transcript_as_fallback(
     db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
 ) -> None:
     session = start(db_client, headers, child, "speech-practice")
-    first = session["rounds"][0]["prompt"]
-    assert first["display_text"] == first["stimulus"]["text"]
+    text = session["rounds"][0]["prompt"]["display_text"]
 
     response = db_client.post(
         f"{SESSIONS}/{session['id']}/rounds/0/answer",
-        json={"answer": {"transcript": f"  {first['display_text'].upper()}! "}},
+        json={"answer": {"transcript": f"  {text.upper()}! "}},
         headers=headers,
     )
 
@@ -523,9 +524,7 @@ def test_speech_practice_scores_transcripts_and_keeps_attempts(
     attempt = db_session.scalar(select(SpeechAttempt))
     assert attempt is not None
     assert (attempt.provider, attempt.accuracy) == ("browser", 100.0)
-
-
-# ---------------------------------------------------------------- history & audio
+    assert attempt.word_scores[0]["expected"] == text
 
 
 def test_session_history_is_newest_first_and_filterable(
@@ -543,12 +542,18 @@ def test_session_history_is_newest_first_and_filterable(
     assert only_sounds[0]["points"] == 90
 
 
-def test_noise_audio_is_public_and_cacheable(db_client: TestClient) -> None:
-    response = db_client.get("/api/audio/noise/pink.wav")
+@pytest.mark.parametrize("game", ["sound-detective", "similar-sounds", "word-sequence"])
+def test_prompts_never_reveal_the_stimulus(
+    db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str], game: str
+) -> None:
+    session = start(db_client, headers, child, game)
 
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "audio/wav"
-    assert "max-age" in response.headers["cache-control"]
-    with wave.open(io.BytesIO(response.content)) as wav:
-        assert wav.getframerate() == 16_000
-    assert db_client.get("/api/audio/noise/brown.wav").status_code == 422
+    rounds = db_session.scalars(
+        select(SessionRound).where(SessionRound.session_id == session["id"])
+    ).all()
+    for shown, stored in zip(
+        session["rounds"], sorted(rounds, key=lambda r: r.round_index), strict=True
+    ):
+        assert set(shown["prompt"]["stimulus"]) == {"type", "audio_url"}
+        assert stored.stimulus["type"] == shown["prompt"]["stimulus"]["type"]
+        assert len(stored.stimulus) > 1  # the private part (word, words or sound) is stored

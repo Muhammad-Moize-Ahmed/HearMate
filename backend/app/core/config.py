@@ -11,6 +11,9 @@ from sqlalchemy.engine import URL, make_url
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
 
+# Per-user cache for downloaded models and generated audio (never inside the repo).
+USER_CACHE_DIR = Path.home() / ".cache" / "hearmate"
+
 # Later files win: the shared root .env (also used by docker compose), then backend/.env overrides.
 ENV_FILES = (REPO_ROOT / ".env", BACKEND_DIR / ".env")
 
@@ -77,6 +80,26 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: SecretStr | None = None
     SMTP_STARTTLS: bool = True
 
+    # --- Speech (Phase 5) ---
+    # Model files and generated audio live outside the repo by default.
+    STT_PROVIDER: Literal["whisper", "azure", "none"] = "whisper"
+    WHISPER_MODEL: str = "base.en"  # downloaded to the Hugging Face cache on first use
+    WHISPER_COMPUTE_TYPE: str = "int8"
+    WHISPER_CPU_THREADS: int = Field(default=0, ge=0)  # 0 = let CTranslate2 decide
+    STT_MAX_CONCURRENCY: int = Field(default=2, ge=1)  # transcriptions running at once
+    TTS_PROVIDER: Literal["piper", "azure", "none"] = "piper"
+    PIPER_VOICE: str = "en_US-lessac-medium"
+    PIPER_VOICE_DIR: Path = USER_CACHE_DIR / "piper"
+    TTS_CACHE_DIR: Path = USER_CACHE_DIR / "tts"
+    # Licensed sound-effect files named <sound_id>.wav|.mp3|.ogg (none ship with the repo).
+    SOUNDS_DIR: Path | None = None
+    AZURE_SPEECH_KEY: SecretStr | None = None
+    AZURE_SPEECH_REGION: str | None = None
+    AZURE_TTS_VOICE: str = "en-IN-NeerjaNeural"
+    AZURE_STT_LANGUAGE: str = "en-IN"
+    SPEECH_MAX_UPLOAD_BYTES: int = Field(default=2_000_000, ge=10_000)
+    SPEECH_MAX_SECONDS: float = Field(default=15.0, gt=0, le=60)
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -88,6 +111,15 @@ class Settings(BaseSettings):
     @classmethod
     def _upper_log_level(cls, value: str) -> str:
         return value.upper()
+
+    @model_validator(mode="after")
+    def _check_azure_speech(self) -> "Settings":
+        uses_azure = "azure" in (self.STT_PROVIDER, self.TTS_PROVIDER)
+        if uses_azure and not (self.AZURE_SPEECH_KEY and self.AZURE_SPEECH_REGION):
+            raise ValueError(
+                "AZURE_SPEECH_KEY and AZURE_SPEECH_REGION are required for Azure speech"
+            )
+        return self
 
     @model_validator(mode="after")
     def _check_production_safety(self) -> "Settings":

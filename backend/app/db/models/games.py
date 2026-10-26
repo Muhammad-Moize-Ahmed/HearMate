@@ -94,6 +94,8 @@ class SessionRound(UUIDPrimaryKeyMixin, Base):
     round_index: Mapped[int] = mapped_column(SmallInteger)
     # Shapes differ per game (a word, a word sequence, a sound id…), hence JSONB.
     prompt: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # Private: what the server plays for this round (never sent to the client).
+    stimulus: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
     expected_answer: Mapped[dict[str, Any]] = mapped_column(JSONB)
     given_answer: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     is_correct: Mapped[bool | None]

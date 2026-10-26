@@ -36,11 +36,11 @@ class WordSequence(GameDefinition):
                 RoundSpec(
                     prompt={
                         "instruction": "Tap the words in the order you heard them.",
-                        "stimulus": {"type": "speech_sequence", "texts": sequence},
                         "options": word_options(options),
                         "noise": None,
                         "display_text": None,
                     },
+                    stimulus={"type": "speech_sequence", "texts": sequence},
                     expected={"sequence": sequence},
                 )
             )

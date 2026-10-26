@@ -3,15 +3,13 @@
 Round prompts all have the same outer shape so the player UI can be generic:
 
     {"instruction": str,
-     "stimulus": {"type": "sound", "sound_id": ...}
-               | {"type": "speech", "text": ...}
-               | {"type": "speech_sequence", "texts": [...]},
+     "stimulus": {"type": "sound" | "speech" | "speech_sequence", "audio_url": str},
      "options": [{"id": ..., "label": ...}],        # empty for speech games
-     "noise": {"kind", "snr_db", "url"} | None,
+     "noise": {"kind", "snr_db"} | None,            # already mixed into the audio
      "display_text": str | None}                    # text shown on screen (speech practice)
 
-Until Phase 5 serves stimulus audio from the server, "speech" stimuli carry the text for the
-browser to speak. Scoring still happens only on the server.
+What the stimulus actually is (which word or sound) stays private in `RoundSpec.stimulus`; the
+service adds the public `audio_url`, and the server renders the audio (speech, sound, noise).
 """
 
 import random
@@ -26,7 +24,7 @@ from ....core.schemas import InputModel
 from ....db.models import SkillCategory
 from ..content import ContentBank
 from ..levels import tier_for_level
-from ..noise import TIER_SNR_DB, NoiseKind, noise_url
+from ..noise import TIER_SNR_DB, NoiseKind
 
 Token = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 
@@ -49,12 +47,12 @@ class RoundContext:
     rng: random.Random
     bank: ContentBank
     with_noise: bool
-    api_prefix: str = "/api"
 
 
 @dataclass(frozen=True, slots=True)
 class RoundSpec:
-    prompt: dict[str, Any]
+    prompt: dict[str, Any]  # public (no "stimulus": the service adds its audio_url)
+    stimulus: dict[str, Any]  # private: {"type": "sound", "sound_id"} | {"type": "speech", ...}
     expected: dict[str, Any]
     noise_snr_db: float | None = None
 
@@ -107,11 +105,11 @@ def optional_noise(
     if not (supports_noise and ctx.with_noise):
         return None, None
     snr = TIER_SNR_DB[tier_for_level(ctx.level)]
-    return noise_spec(NoiseKind.PINK, snr, ctx.api_prefix), snr
+    return noise_spec(NoiseKind.PINK, snr), snr
 
 
-def noise_spec(kind: NoiseKind, snr_db: float, api_prefix: str) -> dict[str, Any]:
-    return {"kind": kind.value, "snr_db": snr_db, "url": noise_url(kind, api_prefix)}
+def noise_spec(kind: NoiseKind, snr_db: float) -> dict[str, Any]:
+    return {"kind": kind.value, "snr_db": snr_db}
 
 
 def word_options(words: Sequence[str]) -> list[dict[str, str]]:

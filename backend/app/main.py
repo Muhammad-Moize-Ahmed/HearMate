@@ -12,14 +12,15 @@ from .modules.care_team.router import parent_router as care_team_parent_router
 from .modules.care_team.router import therapist_router as care_team_therapist_router
 from .modules.children.router import router as children_router
 from .modules.games.router import (
-    audio_router,
     child_progress_router,
     games_router,
     sessions_router,
+    speech_router,
 )
 from .modules.goals.router import router as goals_router
 from .modules.health.router import router as health_router
 from .providers.email import build_email_sender
+from .providers.speech import build_speech_services
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.rate_limiter = RateLimiter()
     app.state.email_sender = build_email_sender(settings)
+    app.state.speech = build_speech_services(settings)  # models load lazily on first use
 
     app.add_middleware(
         CORSMiddleware,
@@ -61,7 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(games_router)
     api.include_router(sessions_router)
     api.include_router(child_progress_router)
-    api.include_router(audio_router)
+    api.include_router(speech_router)
     app.include_router(api)
 
     return app

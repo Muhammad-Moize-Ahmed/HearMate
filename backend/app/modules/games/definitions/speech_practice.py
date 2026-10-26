@@ -2,15 +2,16 @@ from typing import Any
 
 from ....core.schemas import InputModel
 from ....db.models import Difficulty, SkillCategory
-from ..scoring import SPEECH_PASS_SCORE, speech_similarity
+from ..pronunciation import score_pronunciation
+from ..scoring import SPEECH_PASS_SCORE
 from .base import GameDefinition, RoundCheck, RoundContext, RoundSpec, SpeechAnswer, sample_cycle
 
 
 class SpeechPractice(GameDefinition):
     """Repeat a word or sentence. Levels 1-3: short words, 4-6: longer words, 7-9: sentences.
 
-    The answer is a transcript: from the browser's speech recognition for now, and from the
-    server's speech-to-text in Phase 5. Both are scored by the same function.
+    Answers are transcripts, normally from the server's speech-to-text (audio upload); a
+    browser transcript is accepted as a fallback. Both are scored word by word and sound by sound.
     """
 
     slug = "speech-practice"
@@ -34,11 +35,11 @@ class SpeechPractice(GameDefinition):
             RoundSpec(
                 prompt={
                     "instruction": "Listen, then say it out loud.",
-                    "stimulus": {"type": "speech", "text": text},
                     "options": [],
                     "noise": None,
                     "display_text": text,
                 },
+                stimulus={"type": "speech", "text": text},
                 expected={"text": text},
             )
             for text in sample_cycle(ctx.rng, items, self.rounds_per_session)
@@ -46,11 +47,24 @@ class SpeechPractice(GameDefinition):
 
     def check(self, expected: dict[str, Any], answer: InputModel) -> RoundCheck:
         assert isinstance(answer, SpeechAnswer)  # noqa: S101 - validated by the service
-        score = speech_similarity(expected["text"], answer.transcript)
+        result = score_pronunciation(expected["text"], answer.transcript)
         return RoundCheck(
-            is_correct=score >= SPEECH_PASS_SCORE,
-            score=score,
-            feedback={"score": score, "heard": answer.transcript},
+            is_correct=result.score >= SPEECH_PASS_SCORE,
+            score=result.score,
+            feedback={
+                "score": result.score,
+                "heard": answer.transcript,
+                "words": [
+                    {
+                        "expected": w.expected,
+                        "heard": w.heard,
+                        "score": w.score,
+                        "missed_sounds": w.missed_sounds,
+                    }
+                    for w in result.words
+                ],
+                "practise_sounds": result.practise_sounds,
+            },
         )
 
     def reference_response_ms(self, level: int) -> int:

@@ -7,6 +7,7 @@ from fastapi import Depends, Request
 
 from ..auth.rate_limit import RateLimiter
 from ..providers.email import EmailSender
+from ..providers.speech import SpeechServices
 from .config import Settings
 
 
@@ -20,6 +21,10 @@ def get_rate_limiter(request: Request) -> RateLimiter:
 
 def get_email_sender(request: Request) -> EmailSender:
     return cast(EmailSender, request.app.state.email_sender)
+
+
+def get_speech_services(request: Request) -> SpeechServices:
+    return cast(SpeechServices, request.app.state.speech)
 
 
 def get_client_ip(request: Request) -> str | None:
@@ -39,4 +44,5 @@ def get_client_ip(request: Request) -> str | None:
 AppSettings = Annotated[Settings, Depends(get_app_settings)]
 Limiter = Annotated[RateLimiter, Depends(get_rate_limiter)]
 Mailer = Annotated[EmailSender, Depends(get_email_sender)]
+Speech = Annotated[SpeechServices, Depends(get_speech_services)]
 ClientIp = Annotated[str | None, Depends(get_client_ip)]

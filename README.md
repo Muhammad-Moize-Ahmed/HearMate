@@ -15,8 +15,9 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 2 | Authentication and role-based access (backend) | ✅ done |
 | 3 | Children, goals, therapist linking (backend) | ✅ done |
 | 4 | Therapy game engine (backend): 5 games, adaptive levels, server-side scoring | ✅ done |
-| 5 | Speech services (STT, TTS, server audio) | ⏳ next |
-| 6–9 | Progress, frontend, PWA/offline, deploy | planned |
+| 5 | Speech services: Whisper STT, Piper TTS, server-rendered audio, pronunciation scoring | ✅ done |
+| 6 | Progress, reports and gamification | ⏳ next |
+| 7–9 | Frontend, PWA/offline, deploy | planned |
 
 ## Tech stack
 
@@ -39,6 +40,7 @@ docker-compose.yml   local PostgreSQL
 - Node.js ≥ 22 and pnpm 12 (`brew install pnpm`)
 - uv (`brew install uv`); it installs Python 3.12 for you
 - Docker Desktop (for PostgreSQL)
+- ffmpeg (`brew install ffmpeg`), used for speech audio
 - Optional: pre-commit and gitleaks (`brew install pre-commit gitleaks`)
 
 ## Getting started
@@ -57,6 +59,7 @@ cd backend
 uv sync
 uv run alembic upgrade head      # create/upgrade the schema
 uv run python -m app.cli sync-games   # load the game catalogue
+uv run python -m app.cli speech-setup # one-off: download speech models (~200 MB, outside the repo)
 uv run python -m app.cli create-admin --email you@example.com   # optional: first admin
 uv run uvicorn app.main:app --reload   # in dev, emailed codes are printed in this log
 

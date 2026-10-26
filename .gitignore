@@ -35,10 +35,19 @@ __pycache__/
 htmlcov/
 
 # --- Runtime data: user uploads, generated audio, model weights ---
+# Speech models and TTS audio default to ~/.cache/hearmate (outside the repo); these
+# rules are a safety net in case PIPER_VOICE_DIR / TTS_CACHE_DIR point inside it.
 uploads/
 backend/media/
 backend/cache/
+backend/models/
 *.wav
+*.mp3
+*.ogg
+*.webm
 *.pkl
 *.ckpt
 *.bin
+*.onnx
+*.onnx.json
+*.safetensors

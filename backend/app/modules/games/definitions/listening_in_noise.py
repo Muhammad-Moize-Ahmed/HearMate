@@ -48,11 +48,11 @@ class ListeningInNoise(GameDefinition):
                 RoundSpec(
                     prompt={
                         "instruction": "Which word did you hear?",
-                        "stimulus": {"type": "speech", "text": target},
                         "options": word_options(options),
-                        "noise": noise_spec(kind, snr, ctx.api_prefix),
+                        "noise": noise_spec(kind, snr),
                         "display_text": None,
                     },
+                    stimulus={"type": "speech", "text": target},
                     expected={"choice": target},
                     noise_snr_db=snr,
                 )

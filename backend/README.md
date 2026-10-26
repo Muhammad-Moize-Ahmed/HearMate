@@ -11,7 +11,11 @@ uv run pytest -m "not db"                 # only tests that don't need PostgreSQ
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python -m app.cli create-admin --email you@example.com   # prompts for a password
 uv run python -m app.cli sync-games       # create/update the games table from the code registry
+uv run python -m app.cli speech-setup     # download speech models (outside the repo) + self-test
+HEARMATE_SPEECH_MODELS=1 uv run pytest tests/test_speech_models.py   # real-model round trips
 ```
+
+ffmpeg must be on `PATH` (`brew install ffmpeg` / `apt-get install ffmpeg`).
 
 ## Layout
 
@@ -36,6 +40,8 @@ app/
     rate_limit.py    in-memory sliding-window limiter
   providers/
     email/           EmailSender interface; console (dev) and SMTP backends
+    speech/          SttProvider (Whisper, Azure) and TtsProvider (Piper, Azure) interfaces,
+                     TTS disk cache, ffmpeg decoding and noise mixing (audio.py)
   db/
     base.py          declarative Base, constraint naming, UUID/timestamp mixins, str_enum()
     session.py       engine, sessionmaker, get_db dependency
@@ -47,10 +53,12 @@ app/
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
     care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
-    games/           therapy game engine: /api/games, /api/sessions, /api/children/{id}/sessions|levels, /api/audio/noise
+    games/           therapy game engine: /api/games, /api/sessions, /api/children/{id}/sessions|levels, /api/speech/status
       definitions/   one file per game + base.py (the contract); REGISTRY maps slug -> game
       content/       bank.json: the curated, versioned word / minimal-pair / sentence / sound bank
       adaptive.py    level rules (DifficultyStrategy); levels.py, scoring.py, noise.py, catalogue.py
+      pronunciation.py  word- and phoneme-level scoring (CMU dictionary)
+      stimulus.py    renders a round's audio: TTS / sound file + background noise
 alembic/             migrations; versions/ starts from a single baseline
 tests/               unit tests; tests/db/ needs PostgreSQL
 ```
@@ -131,13 +139,40 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
   `python -m app.cli sync-games`.
 - **Content:** edit `content/bank.json` (validated on load; bump `version`). Rounds store the exact item
   they used, so bank edits never change past sessions.
-- **Noise:** rounds include `{"kind", "snr_db", "url"}`. `/api/audio/noise/{white|pink}.wav` is generated
-  at -20 dBFS; play the stimulus at the same level and the noise at gain `10^(-snr_db/20)`.
+- **Stimulus audio is rendered on the server.** Each prompt has `stimulus: {type, audio_url}`; the word, words
+  or sound itself stays in the private `session_rounds.stimulus` column, so the answer isn't in the prompt.
+  `GET .../rounds/{i}/stimulus` returns WAV (16 kHz mono) with any background noise already mixed in at the
+  round's signal-to-noise ratio (`prompt.noise = {kind, snr_db}` is for display only). It needs the bearer token:
+  fetch it, then play a blob URL.
+- **Not included:** sound-effect files for Sound Detective. Put licensed files (e.g. CC0) named
+  `<sound_id>.wav|.mp3|.ogg` in `SOUNDS_DIR`; until then those rounds return 503 `sound_unavailable`. The old app's MP3s
+  have unknown licences, so they were not copied.
+- **Not included:** LLM-generated extra content. The bank is the only source.
 
-**Not yet (by design, later phases):**
-- **Stimulus audio:** rounds name the stimulus (`text` or `sound_id`). Until Phase 5 serves audio from the server,
-  a browser can read the answer from the prompt. Scores are still only computed server-side.
-- **Sound effect files:** these are still needed. The old app's MP3s have unknown licences, so they were not copied.
-- **Speech Practice transcripts** come from the browser for now (`provider = "browser"` in `speech_attempts`).
-  Phase 5 adds server speech-to-text.
-- **LLM-generated extra content:** not implemented. The bank is the only source.
+## Speech services
+
+| | Default (local, free) | Optional |
+|---|---|---|
+| Speech-to-text | faster-whisper `base.en`, CPU int8 (`STT_PROVIDER=whisper`) | Azure (`azure`), or `none` |
+| Text-to-speech | Piper `en_US-lessac-medium` (`TTS_PROVIDER=piper`) | Azure (`azure`, voice `en-IN-NeerjaNeural`), or `none` |
+
+- **Models live outside the repo:**
+  - the Piper voice is in `~/.cache/hearmate/piper`;
+  - Whisper is in the Hugging Face cache (`~/.cache/huggingface`);
+  - generated speech is cached in `~/.cache/hearmate/tts`, keyed by voice and text.
+
+  Download the models with `python -m app.cli speech-setup`. The models load lazily on first use, and `.gitignore`
+  also blocks model files as a safety net.
+- **Spoken answers:** `POST /api/sessions/{id}/rounds/{i}/speech?response_time_ms=...` with the raw recording as the
+  body (`Content-Type: audio/webm`, `audio/ogg`, `audio/mp4`, `audio/wav`, ...).
+  - **Limits:** at most 2 MB, enforced while streaming, so oversized uploads are cut off early; at most 15 s;
+    30 uploads per minute per account.
+  - **Pipeline:** ffmpeg decodes the recording (pipe input only, audio containers only), Whisper transcribes it in
+    a worker thread (2 at a time by default), then it is scored word by word and sound by sound.
+  - **Privacy:** recordings are not stored; only the transcript and scores are kept (`speech_attempts`).
+  - **Ordering:** permissions and round state are checked before the slow transcription runs.
+- **Pronunciation scoring:** each word is compared through its sounds (ARPAbet phonemes from the CMU dictionary).
+  The feedback lists per-word scores and the `practise_sounds` a child missed most (e.g. `TH` for "three" -> "tree").
+  A round passes at 75/100.
+- **Browser fallback:** `GET /api/speech/status` says whether server STT/TTS are set up. A browser transcript can
+  still be sent to the normal `/answer` endpoint, and is stored with `provider = "browser"`.

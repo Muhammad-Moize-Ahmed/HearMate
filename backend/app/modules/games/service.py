@@ -1,14 +1,17 @@
 """Game sessions owned by the server.
 
-Flow: start (server builds the rounds) -> answer each round (server checks it) -> complete
-(server totals accuracy and points and moves the child's level). Clients never send scores.
+Flow: start (server builds the rounds) -> play each round's stimulus audio -> answer it (server
+checks it; speech answers are uploaded as audio and transcribed here) -> complete (server totals
+accuracy and points and moves the child's level). Clients never send scores.
 """
 
 import random
 import statistics
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
+from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
@@ -29,6 +32,7 @@ from ...db.models import (
     SkillLevel,
     SpeechAttempt,
 )
+from ...providers.speech import SpeechServices
 from .adaptive import DEFAULT_STRATEGY, DifficultyStrategy, LevelDecision, SessionPerformance
 from .content import ContentBank, load_bank
 from .definitions import REGISTRY, GameDefinition, RoundContext
@@ -54,6 +58,22 @@ MAX_DURATION_SECONDS = 2 * 60 * 60
 class AnswerValidationError(AppError):
     status_code = HTTPStatus.UNPROCESSABLE_ENTITY
     code = "validation_error"
+
+
+@dataclass(frozen=True, slots=True)
+class SpeechMeta:
+    """How a spoken answer was recognised (stored with the attempt)."""
+
+    provider: str
+    audio_duration_ms: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Stimulus:
+    """What the server should play for a round (private), and any noise to mix in."""
+
+    content: dict[str, Any]
+    noise: dict[str, Any] | None
 
 
 class GameSessionService:
@@ -159,13 +179,7 @@ class GameSessionService:
         # Seeded from the session id, so a session's rounds can be regenerated when debugging.
         rng = random.Random(session.id.int)  # noqa: S311 - game content, not security
         specs = definition.build_rounds(
-            RoundContext(
-                level=level,
-                rng=rng,
-                bank=self.bank,
-                with_noise=session.with_noise,
-                api_prefix=self.settings.API_PREFIX,
-            )
+            RoundContext(level=level, rng=rng, bank=self.bank, with_noise=session.with_noise)
         )
         session.total_rounds = len(specs)
         session.noise_snr_db = specs[0].noise_snr_db if specs else None
@@ -175,7 +189,15 @@ class GameSessionService:
             SessionRound(
                 session_id=session.id,
                 round_index=index,
-                prompt=spec.prompt,
+                # The client gets a URL to the audio, never the word or sound itself.
+                prompt=spec.prompt
+                | {
+                    "stimulus": {
+                        "type": spec.stimulus["type"],
+                        "audio_url": self._stimulus_url(session.id, index),
+                    }
+                },
+                stimulus=spec.stimulus,
                 expected_answer=spec.expected,
                 noise_snr_db=spec.noise_snr_db,
             )
@@ -188,17 +210,58 @@ class GameSessionService:
         session = self._load(session_id)
         return self._session_out(session)
 
-    def answer(self, session_id: uuid.UUID, index: int, body: AnswerIn) -> AnswerOut:
+    def stimulus(self, session_id: uuid.UUID, index: int) -> Stimulus:
+        session = self._load(session_id)
+        round_ = self._round(session, index)
+        if not round_.stimulus:
+            raise NotFoundError("This round has no audio", code="stimulus_unavailable")
+        return Stimulus(content=round_.stimulus, noise=round_.prompt.get("noise"))
+
+    def answer_speech(
+        self,
+        session_id: uuid.UUID,
+        index: int,
+        audio: bytes,
+        response_time_ms: int | None,
+        speech: SpeechServices,
+    ) -> AnswerOut:
+        """Transcribe an uploaded recording and answer the round with it.
+
+        Permissions and round state are checked before the (slow) transcription, and again
+        when the answer is recorded.
+        """
+        session = self._load(session_id)
+        _require_in_progress(session)
+        if not self._definition(session).requires_microphone:
+            raise AppError("This game doesn't take spoken answers", code="not_a_speech_game")
+        round_ = self._round(session, index)
+        if round_.answered_at is not None:
+            raise ConflictError("This round has already been answered", code="already_answered")
+        self.db.rollback()  # don't hold a transaction open while transcribing
+
+        transcription, clip = speech.transcribe(audio)
+        return self.answer(
+            session_id,
+            index,
+            AnswerIn(
+                answer={"transcript": transcription.text[:500]},
+                response_time_ms=response_time_ms,
+            ),
+            speech_meta=SpeechMeta(transcription.provider, clip.duration_ms),
+        )
+
+    def answer(
+        self,
+        session_id: uuid.UUID,
+        index: int,
+        body: AnswerIn,
+        *,
+        speech_meta: SpeechMeta | None = None,
+    ) -> AnswerOut:
         session = self._load(session_id, lock=True)
         _require_in_progress(session)
         definition = self._definition(session)
-        round_ = self.db.scalar(
-            select(SessionRound)
-            .where(SessionRound.session_id == session.id, SessionRound.round_index == index)
-            .with_for_update()
-        )
-        if round_ is None:
-            raise NotFoundError("Round not found")
+        round_ = self._round(session, index, lock=True)
         if round_.answered_at is not None:
             raise ConflictError("This round has already been answered", code="already_answered")
 
@@ -219,13 +282,16 @@ class GameSessionService:
         round_.response_time_ms = body.response_time_ms
         round_.answered_at = datetime.now(UTC)
         if isinstance(answer, SpeechAnswer):
+            meta = speech_meta or SpeechMeta(provider="browser")
             self.db.add(
                 SpeechAttempt(
                     round_id=round_.id,
                     expected_text=round_.expected_answer["text"],
                     recognized_text=answer.transcript,
                     accuracy=check.score,
-                    provider="browser",
+                    word_scores=check.feedback.get("words", []),
+                    provider=meta.provider,
+                    audio_duration_ms=meta.audio_duration_ms,
                 )
             )
         self.db.commit()
@@ -339,6 +405,18 @@ class GameSessionService:
         except NotFoundError:
             raise NotFoundError("Session not found") from None
         return session
+
+    def _round(self, session: GameSession, index: int, *, lock: bool = False) -> SessionRound:
+        query = select(SessionRound).where(
+            SessionRound.session_id == session.id, SessionRound.round_index == index
+        )
+        round_ = self.db.scalar(query.with_for_update() if lock else query)
+        if round_ is None:
+            raise NotFoundError("Round not found")
+        return round_
+
+    def _stimulus_url(self, session_id: uuid.UUID, index: int) -> str:
+        return f"{self.settings.API_PREFIX}/sessions/{session_id}/rounds/{index}/stimulus"
 
     def _definition(self, session: GameSession) -> GameDefinition:
         game = self.db.get(Game, session.game_id)

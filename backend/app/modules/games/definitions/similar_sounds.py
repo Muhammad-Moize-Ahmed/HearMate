@@ -45,11 +45,11 @@ class SimilarSounds(GameDefinition):
                 RoundSpec(
                     prompt={
                         "instruction": "Which word did you hear?",
-                        "stimulus": {"type": "speech", "text": target},
                         "options": word_options(options),
                         "noise": noise,
                         "display_text": None,
                     },
+                    stimulus={"type": "speech", "text": target},
                     expected={"choice": target, "contrast": pair_set.contrast},
                     noise_snr_db=snr,
                 )

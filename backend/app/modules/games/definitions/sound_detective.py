@@ -48,11 +48,11 @@ class SoundDetective(GameDefinition):
                 RoundSpec(
                     prompt={
                         "instruction": "Which sound did you hear?",
-                        "stimulus": {"type": "sound", "sound_id": target.id},
                         "options": [{"id": s.id, "label": s.label} for s in options],
                         "noise": noise,
                         "display_text": None,
                     },
+                    stimulus={"type": "sound", "sound_id": target.id},
                     expected={"choice": target.id},
                     noise_snr_db=snr,
                 )

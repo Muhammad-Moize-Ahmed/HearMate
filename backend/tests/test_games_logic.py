@@ -1,9 +1,7 @@
 """Game logic that needs no database: adaptive rules, scoring, noise, content and definitions."""
 
-import io
 import json
 import random
-import wave
 
 import pytest
 from pydantic import ValidationError
@@ -14,8 +12,10 @@ from app.modules.games.content import ContentBank, load_bank
 from app.modules.games.definitions import REGISTRY, RoundContext
 from app.modules.games.definitions.base import ChoiceAnswer, SequenceAnswer, SpeechAnswer
 from app.modules.games.levels import tier_for_level
-from app.modules.games.noise import NoiseKind, noise_wav
-from app.modules.games.scoring import session_points, speech_similarity
+from app.modules.games.noise import NoiseKind, noise_samples
+from app.modules.games.pronunciation import score_pronunciation
+from app.modules.games.scoring import session_points
+from app.providers.speech.audio import TARGET_RMS, rms
 
 STRATEGY = RollingThresholdStrategy()
 
@@ -86,29 +86,48 @@ def test_points_scale_with_difficulty_and_reward_a_perfect_round() -> None:
         ("cat", "cat", 100, 100),
         ("cat", "Cat!", 100, 100),
         ("cat", "um cat", 100, 100),
-        ("elephant", "elefant", 75, 99),
+        ("elephant", "elefant", 75, 99),  # not in the dictionary: letters
         ("cat", "dog", 0, 40),
+        ("pat", "bat", 60, 70),  # one sound of three wrong
         ("The cat is sleeping.", "the cat is sleeping", 100, 100),
-        ("The cat is sleeping.", "the cat sleeping", 75, 99),
+        ("The cat is sleeping.", "the cat sleeping", 75, 75),  # one word of four missing
         ("The cat is sleeping.", "", 0, 0),
     ],
 )
-def test_speech_similarity(expected: str, heard: str, minimum: float, maximum: float) -> None:
-    assert minimum <= speech_similarity(expected, heard) <= maximum
+def test_pronunciation_scores(expected: str, heard: str, minimum: float, maximum: float) -> None:
+    assert minimum <= score_pronunciation(expected, heard).score <= maximum
+
+
+def test_pronunciation_reports_the_sounds_to_practise() -> None:
+    result = score_pronunciation("three", "tree")
+
+    assert result.practise_sounds == ["TH"]
+    assert result.words[0].missed_sounds == ["TH"]
+
+
+def test_missing_words_count_against_all_their_sounds() -> None:
+    result = score_pronunciation("Look at the yellow star.", "look at the star")
+
+    yellow = next(w for w in result.words if w.expected == "yellow")
+    assert (yellow.heard, yellow.score) == (None, 0.0)
+    assert yellow.missed_sounds  # every sound of the word
+
+
+def test_extra_words_are_not_penalised() -> None:
+    assert score_pronunciation("I wash my hands.", "um I wash my hands now").score == 100.0
 
 
 # ---------------------------------------------------------------- noise
 
 
 @pytest.mark.parametrize("kind", list(NoiseKind))
-def test_noise_is_a_valid_deterministic_wav(kind: NoiseKind) -> None:
-    data = noise_wav(kind)
+def test_noise_is_deterministic_and_levelled(kind: NoiseKind) -> None:
+    samples = noise_samples(kind)
 
-    with wave.open(io.BytesIO(data)) as wav:
-        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 16_000)
-        assert wav.getnframes() == 4 * 16_000
-    assert noise_wav(kind) == data
-    assert noise_wav(NoiseKind.WHITE) != noise_wav(NoiseKind.PINK)
+    assert len(samples) == 4 * 16_000
+    assert rms(samples) == pytest.approx(TARGET_RMS, rel=0.01)
+    assert (noise_samples(kind) == samples).all()
+    assert not (noise_samples(NoiseKind.WHITE) == noise_samples(NoiseKind.PINK)).all()
 
 
 # ---------------------------------------------------------------- content bank
@@ -151,6 +170,11 @@ def test_every_game_builds_valid_rounds_at_every_level(slug: str, level: int) ->
         has_noise = spec.prompt["noise"] is not None
         assert has_noise == (game.supports_noise or game.always_noise)
         assert (spec.noise_snr_db is not None) == has_noise
+        if has_noise:
+            assert set(spec.prompt["noise"]) == {"kind", "snr_db"}
+        # The stimulus (what is played) is private: it never goes into the prompt.
+        assert "stimulus" not in spec.prompt
+        assert spec.stimulus["type"] in {"sound", "speech", "speech_sequence"}
 
 
 def test_rounds_are_reproducible_from_the_seed() -> None:
