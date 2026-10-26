@@ -2,12 +2,15 @@
 
 uv run python -m app.cli create-admin --email admin@example.com
 uv run python -m app.cli sync-games
+uv run python -m app.cli export-openapi --output ../frontend/src/api/openapi.json
 """
 
 import argparse
 import getpass
+import json
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -15,6 +18,7 @@ from .auth.passwords import hash_secret
 from .core.config import get_settings
 from .db.models import User, UserRole
 from .db.session import get_sessionmaker
+from .main import create_app
 from .modules.auth.schemas import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from .modules.games.catalogue import sync_games
 from .modules.games.pronunciation import score_pronunciation
@@ -92,6 +96,18 @@ def speech_setup_command() -> int:
     return 0
 
 
+def export_openapi(output: Path | None) -> int:
+    """Write the API schema (for the frontend's generated types) without starting a server."""
+    document = json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n"
+    if output is None:
+        sys.stdout.write(document)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(document, encoding="utf-8")
+        print(f"OpenAPI schema written to {output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -107,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
         "speech-setup", help="Download speech models (outside the repo) and self-test them"
     )
 
+    openapi = commands.add_parser(
+        "export-openapi", help="Write the OpenAPI schema as JSON (stdout by default)"
+    )
+    openapi.add_argument("--output", type=Path, help="File to write instead of stdout")
+
     args = parser.parse_args(argv)
     if args.command == "create-admin":
         return create_admin(args.email, args.first_name, args.last_name)
@@ -114,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
         return sync_games_command()
     if args.command == "speech-setup":
         return speech_setup_command()
+    if args.command == "export-openapi":
+        return export_openapi(args.output)
     return 2
 
 

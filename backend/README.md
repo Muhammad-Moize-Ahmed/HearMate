@@ -12,6 +12,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python -m app.cli create-admin --email you@example.com   # prompts for a password
 uv run python -m app.cli sync-games       # create/update the games table from the code registry
 uv run python -m app.cli speech-setup     # download speech models (outside the repo) + self-test
+uv run python -m app.cli export-openapi --output ../frontend/src/api/openapi.json   # API schema (or: pnpm gen:api)
 HEARMATE_SPEECH_MODELS=1 uv run pytest tests/test_speech_models.py   # real-model round trips
 ```
 
@@ -22,7 +23,7 @@ ffmpeg must be on `PATH` (`brew install ffmpeg` / `apt-get install ffmpeg`).
 ```
 app/
   main.py            app factory: middleware, error handlers, routers, app.state
-  cli.py             operator commands (create-admin)
+  cli.py             operator commands (create-admin, sync-games, speech-setup, export-openapi)
   core/
     config.py        settings from env / .env (pydantic-settings); production safety checks
     logging.py       JSON or console logs, each line tagged with the request ID

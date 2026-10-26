@@ -1,4 +1,6 @@
+import json
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -54,3 +56,13 @@ def test_create_admin_refuses_existing_emails(
     answer_prompts(monkeypatch, "a-strong-admin-pass", "a-strong-admin-pass")
 
     assert cli.main(["create-admin", "--email", "taken@example.com"]) == 1
+
+
+def test_export_openapi_writes_the_api_schema(tmp_path: Path) -> None:
+    output = tmp_path / "openapi.json"
+
+    assert cli.main(["export-openapi", "--output", str(output)]) == 0
+
+    document = json.loads(output.read_text())
+    assert "/api/auth/login" in document["paths"]
+    assert "/api/children/{child_id}/learning-plans" in document["paths"]

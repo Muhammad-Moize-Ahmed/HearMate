@@ -17,12 +17,15 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 4 | Therapy game engine (backend): 5 games, adaptive levels, server-side scoring | ✅ done |
 | 5 | Speech services: Whisper STT, Piper TTS, server-rendered audio, pronunciation scoring | ✅ done |
 | 6 | Progress, reports and gamification: streaks, achievements, goals, parent/therapist reports | ✅ done |
-| 7 | Frontend | ⏳ next |
+| 7a | Frontend foundations (router, API types, role layouts, guards) and sign-in screens | ✅ done |
+| 7b+ | Frontend: dashboards, children, games, reports | ⏳ next |
 | 8–9 | PWA/offline, deploy | planned |
 
 ## Tech stack
 
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Vitest + Testing Library, ESLint + Prettier
+- **Frontend:** React 19, TypeScript (strict), Vite, Tailwind CSS v4, React Router 7, TanStack Query 5,
+  openapi-fetch + openapi-typescript (API types generated from the backend), react-hook-form + zod;
+  Vitest + Testing Library, ESLint + Prettier
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 17 (psycopg 3), pydantic-settings; pytest, ruff, mypy (strict)
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for Python, [pnpm](https://pnpm.io/) for Node, Docker Compose, pre-commit + gitleaks, GitHub Actions
 
@@ -74,6 +77,45 @@ The frontend calls relative `/api/...` URLs. In development, Vite proxies them t
 (`API_PROXY_TARGET`, default `http://localhost:8000`), so no backend host is hardcoded in the app.
 The home page shows **API online** once both servers are running.
 `GET /api/health/ready` also checks the database connection.
+
+### API types
+
+The frontend's API types are generated from the backend, never written by hand. After changing a backend route or
+schema, regenerate them and commit both files:
+
+```bash
+cd frontend
+pnpm gen:api   # writes src/api/openapi.json (via `python -m app.cli export-openapi`) and src/api/schema.d.ts
+```
+
+## Frontend
+
+```
+src/
+  App.tsx            providers + router
+  app/               routes.tsx (every screen, with guards), layouts/ (auth, parent/therapist/admin, child), query client
+  api/               generated schema, `api` (authenticated) and `publicApi` (sign-in) clients, ApiError
+  auth/              session (in-memory tokens + refresh), AuthProvider, route guards, post-sign-in redirects
+  features/          auth/ (login, sign up, verify email, forgot password), home/ (role home pages), landing/
+  components/ui/     Button, TextField/PasswordField, Alert, CodeInput, PinPad, Logo, Spinner
+  test/              mockApi (fake backend for tests), renderApp (real routes in memory)
+```
+
+| Path | Who | |
+|---|---|---|
+| `/` | anyone | landing page |
+| `/login` (`?as=child` / `?as=therapist`) | signed out | tabs: parent (email + password), child (name + PIN pad), therapist |
+| `/signup` (`?role=therapist`) | signed out | parent or therapist account |
+| `/verify-email`, `/forgot-password` | signed out | 6-digit emailed codes |
+| `/parent`, `/therapist`, `/admin`, `/play` | that kind of account only | role areas (home pages for now) |
+
+- **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
+  httpOnly cookie restores the sign-in. Because the backend ends the whole sign-in if a refresh token is used twice,
+  refreshes never overlap: one request per tab, and tabs take turns through a Web Lock.
+- **Guards:** a signed-out visitor is sent to sign in and then back to the page they asked for. An account that opens
+  another role's area is sent to its own. Signed-in users skip the sign-in screens.
+- **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
+  for PINs, emoji avatars, and animations switched off under "reduce motion".
 
 ## Quality checks
 

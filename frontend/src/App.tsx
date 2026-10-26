@@ -1,36 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { createBrowserRouter, RouterProvider } from 'react-router';
 
-type ApiStatus = 'checking' | 'online' | 'offline';
-
-const statusLabel: Record<ApiStatus, string> = {
-  checking: 'Checking API…',
-  online: 'API online',
-  offline: 'API unreachable',
-};
+import { Providers } from './app/Providers';
+import { createQueryClient } from './app/queryClient';
+import { routes } from './app/routes';
 
 function App() {
-  const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/health', { signal: controller.signal })
-      .then((res) => setApiStatus(res.ok ? 'online' : 'offline'))
-      .catch((err: unknown) => {
-        if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          setApiStatus('offline');
-        }
-      });
-    return () => controller.abort();
-  }, []);
+  // Created once per mount (not per module), so each test starts with an empty cache.
+  const [queryClient] = useState(createQueryClient);
+  const [router] = useState(() => createBrowserRouter(routes));
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-slate-900">
-      <h1 className="text-4xl font-bold">HearMate</h1>
-      <p className="text-lg text-slate-600">Auditory training for children with APD</p>
-      <p role="status" className="rounded-full bg-white px-4 py-1 text-sm shadow">
-        {statusLabel[apiStatus]}
-      </p>
-    </main>
+    <Providers queryClient={queryClient}>
+      <RouterProvider router={router} />
+    </Providers>
   );
 }
 

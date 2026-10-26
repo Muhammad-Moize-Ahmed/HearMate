@@ -1,1 +1,73 @@
 @import 'tailwindcss';
+
+@theme {
+  /* A rounded, friendly face that is already on the device: nothing is downloaded. */
+  --font-sans:
+    ui-rounded, 'SF Pro Rounded', 'Nunito', 'Varela Round', 'Segoe UI', system-ui, sans-serif;
+
+  /* Brand: a calm violet for actions (white text on 600 passes WCAG AA), sunny accents for fun. */
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-300: #c4b5fd;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #6d28d9;
+  --color-brand-700: #5b21b6;
+  --color-brand-800: #4c1d95;
+  --color-sun-200: #fef08a;
+  --color-sun-300: #fde047;
+  --color-mint-200: #a7f3d0;
+  --color-mint-300: #6ee7b7;
+  --color-coral-200: #fecdd3;
+  --color-coral-300: #fda4af;
+  --color-sky-soft: #bae6fd;
+  --color-ink: #1e1b4b;
+  --color-ink-soft: #4b5563;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pop-in: pop-in 0.35s ease-out both;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-14px);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-brand-50 font-sans text-ink antialiased;
+  }
+  /* A clear focus ring for keyboard users on every interactive element. */
+  :focus-visible {
+    @apply outline-3 outline-offset-2 outline-brand-500;
+  }
+}
+
+/* Respect "reduce motion": no floating or popping. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
