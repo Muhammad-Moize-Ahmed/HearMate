@@ -1,4 +1,5 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import URL, Engine, create_engine, text
 from sqlalchemy.orm import Session
 
+from app.auth.principal import Principal, PrincipalKind, kind_for_role
+from app.auth.tokens import create_access_token
 from app.core.config import BACKEND_DIR, Settings, get_settings
+from app.db.models import Child, User
 from app.db.session import get_db
 from app.main import create_app
 from tests.fakes import RecordingEmailSender
@@ -118,3 +122,23 @@ def db_client(app: FastAPI, db_session: Session) -> Iterator[TestClient]:
 def _clear_settings_cache() -> Iterator[None]:
     yield
     get_settings.cache_clear()
+
+
+AuthHeaders = Callable[[User | Child], dict[str, str]]
+
+
+@pytest.fixture
+def auth_headers(test_settings: Settings) -> AuthHeaders:
+    """Bearer headers for a user or child, minted directly (login itself is tested separately)."""
+
+    def make(account: User | Child) -> dict[str, str]:
+        if isinstance(account, Child):
+            principal = Principal(kind=PrincipalKind.CHILD, id=account.id)
+        else:
+            principal = Principal(kind=kind_for_role(account.role), id=account.id)
+        token = create_access_token(
+            principal, secret_key=test_settings.secret_key(), ttl=timedelta(minutes=5)
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return make

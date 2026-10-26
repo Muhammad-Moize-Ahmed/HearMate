@@ -23,6 +23,7 @@ app/
     logging.py       JSON or console logs, each line tagged with the request ID
     middleware.py    request ID (X-Request-ID), one access-log line per request, crash -> JSON 500
     errors.py        AppError hierarchy and the single error response shape
+    schemas.py       InputModel: base for request bodies (unknown fields are rejected)
     deps.py          dependencies for app.state objects (settings, rate limiter, email) + client IP
     audit.py         record_event(): append to audit_log
   auth/
@@ -42,6 +43,9 @@ app/
     health/          GET /api/health (liveness), GET /api/health/ready (database check)
     auth/            /api/auth/*: signup, verify-email, login, child-login, refresh, logout, password reset, me
     admin/           /api/admin/therapists: list, approve, reject
+    children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
+    goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
+    care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
 alembic/             migrations; versions/ starts from a single baseline
 tests/               unit tests; tests/db/ needs PostgreSQL
 ```
@@ -76,3 +80,21 @@ tests/               unit tests; tests/db/ needs PostgreSQL
 - **Rate limiter:** in memory, so it is per process. Run a single API process, or swap in a shared store
   (e.g. Redis) behind `RateLimiter.hit` before scaling out.
 - **Email in development:** `EMAIL_BACKEND=console` prints emails, including codes, to the backend log.
+
+## Children, goals and the care team
+
+| Action | Parent | Child (self) | Linked therapist | Admin |
+|---|---|---|---|---|
+| List / view child profile | own children | self (parent notes hidden) | active links only, each view audited | no |
+| Create, edit, delete child; set username + PIN | own children | no | no | no |
+| Read goals | yes | yes | yes | no |
+| Create, edit, delete goals | yes | no | no | no |
+| Invite / remove therapists | yes | no | can decline or leave | no |
+| Accept an invitation | no | no | admin-approved therapists | no |
+
+- **Therapist links:** `pending` (invited) → `active` (accepted) → `revoked` (removed by either side). Only
+  `active` links give access. A revoked therapist can be invited again.
+- **Child sign-in:** usernames are unique across all families (3–30 characters, starting with a letter). PINs are 4–8 digits,
+  with obvious ones (1111, 1234, 9876) refused. Changing or removing the login signs the child out everywhere.
+- **Goal progress** (`current_value`) is read-only here; it will be computed from game sessions in Phase 6.
+- **Deleting a child** permanently removes their sessions, goals, links and progress (database cascade).

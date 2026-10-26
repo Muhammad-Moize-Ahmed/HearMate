@@ -82,4 +82,6 @@ def require_approved_therapist(principal: CurrentPrincipal) -> Principal:
 
 
 AdminPrincipal = Annotated[Principal, Depends(require_kinds(PrincipalKind.ADMIN))]
+ParentPrincipal = Annotated[Principal, Depends(require_kinds(PrincipalKind.PARENT))]
+TherapistPrincipal = Annotated[Principal, Depends(require_kinds(PrincipalKind.THERAPIST))]
 ApprovedTherapist = Annotated[Principal, Depends(require_approved_therapist)]

@@ -4,6 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, StringConstraints
 
+from ...core.schemas import InputModel
 from ...db.models import TherapistApprovalStatus
 
 
@@ -22,5 +23,5 @@ class TherapistOut(BaseModel):
     created_at: datetime
 
 
-class RejectTherapistIn(BaseModel):
+class RejectTherapistIn(InputModel):
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]

@@ -41,6 +41,7 @@ class Child(UUIDPrimaryKeyMixin, LoginLockoutMixin, TimestampMixin, Base):
         ARRAY(Text), default=list, server_default="{}"
     )
     interests: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
+    focus_areas: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
     learning_environment: Mapped[str | None] = mapped_column(String(50))
     attention_span: Mapped[str | None] = mapped_column(String(50))
     preferred_learning_style: Mapped[str | None] = mapped_column(String(50))

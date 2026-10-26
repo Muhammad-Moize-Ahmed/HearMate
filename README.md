@@ -13,8 +13,9 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 0 | Repo foundation: layout, tooling, CI, local Postgres | ✅ done |
 | 1 | Backend core: config, DB models, migrations, logging, error format, health checks | ✅ done |
 | 2 | Authentication and role-based access (backend) | ✅ done |
-| 3 | Children, goals, therapist linking | ⏳ next |
-| 4–9 | Game engine, speech, progress, frontend, PWA/offline, deploy | planned |
+| 3 | Children, goals, therapist linking (backend) | ✅ done |
+| 4 | Therapy game engine | ⏳ next |
+| 5–9 | Speech, progress, frontend, PWA/offline, deploy | planned |
 
 ## Tech stack
 

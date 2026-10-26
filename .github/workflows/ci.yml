@@ -62,7 +62,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      # v6.1.0 exactly: the first release that supports pnpm 12 (the floating v6 tag lags behind).
+      - uses: pnpm/action-setup@v6.1.0
         with:
           package_json_file: frontend/package.json
       - uses: actions/setup-node@v5
@@ -84,6 +85,6 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

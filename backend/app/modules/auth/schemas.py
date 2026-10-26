@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, EmailStr, Field, StringConstraints, model_validator
 
+from ...core.schemas import InputModel
 from ...db.models import TherapistApprovalStatus
 
 MIN_PASSWORD_LENGTH = 10
@@ -24,13 +25,13 @@ Username = Annotated[
 Pin = Annotated[str, StringConstraints(pattern=r"^\d{4,8}$")]
 
 
-class TherapistDetailsIn(BaseModel):
+class TherapistDetailsIn(InputModel):
     license_number: OptionalText = None
     organization: OptionalText = None
     specialization: OptionalText = None
 
 
-class SignupIn(BaseModel):
+class SignupIn(InputModel):
     email: Email
     password: NewPassword
     first_name: Name
@@ -45,27 +46,27 @@ class SignupIn(BaseModel):
         return self
 
 
-class VerifyEmailIn(BaseModel):
+class VerifyEmailIn(InputModel):
     email: Email
     password: Password
     code: Code
 
 
-class EmailIn(BaseModel):
+class EmailIn(InputModel):
     email: Email
 
 
-class LoginIn(BaseModel):
+class LoginIn(InputModel):
     email: Email
     password: Password
 
 
-class ChildLoginIn(BaseModel):
+class ChildLoginIn(InputModel):
     username: Username
     pin: Pin
 
 
-class ResetPasswordIn(BaseModel):
+class ResetPasswordIn(InputModel):
     email: Email
     code: Code
     new_password: NewPassword

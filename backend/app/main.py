@@ -8,6 +8,10 @@ from .core.logging import configure_logging
 from .core.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from .modules.admin.router import router as admin_router
 from .modules.auth.router import router as auth_router
+from .modules.care_team.router import parent_router as care_team_parent_router
+from .modules.care_team.router import therapist_router as care_team_therapist_router
+from .modules.children.router import router as children_router
+from .modules.goals.router import router as goals_router
 from .modules.health.router import router as health_router
 from .providers.email import build_email_sender
 
@@ -44,6 +48,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(health_router)
     api.include_router(auth_router)
     api.include_router(admin_router)
+    api.include_router(children_router)
+    api.include_router(goals_router)
+    api.include_router(care_team_parent_router)
+    api.include_router(care_team_therapist_router)
     app.include_router(api)
 
     return app
