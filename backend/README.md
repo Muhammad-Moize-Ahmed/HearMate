@@ -53,6 +53,8 @@ app/
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
     care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
+    notes/           /api/children/{id}/notes: therapist notes; linked therapists write, the parent reads
+    learning_plans/  /api/children/{id}/learning-plans: the therapist's practice plan (UC-7), one active per child
     progress/        progress, reports and gamification: /api/children/{id}/progress|progress/trend|report|
                      achievements|personal-bests, /api/family/progress (recorder.py runs on session completion)
     games/           therapy game engine: /api/games, /api/sessions, /api/children/{id}/sessions|levels, /api/speech/status
@@ -87,9 +89,9 @@ tests/               unit tests; tests/db/ needs PostgreSQL
   send it as `Authorization: Bearer ...` and keep it in memory, not localStorage. The refresh token is an httpOnly
   cookie (`hm_refresh`, path `/api/auth`). `POST /auth/refresh` rotates it; reusing an old one ends the whole session.
 - **Every request** re-checks the account in `get_principal` (disabled or deleted accounts lose access immediately).
-- **Child data:** route handlers must load children through `get_viewable_child`, `get_editable_child` or
-  `get_plan_managed_child`. A caller who can't see a child gets 404, so IDs reveal nothing. Admins have no access to
-  children's therapy data.
+- **Child data:** route handlers must load children through `get_viewable_child`, `get_editable_child`,
+  `get_plan_readable_child` or `get_plan_managed_child`. A caller who can't see a child gets 404, so IDs reveal
+  nothing. Admins have no access to children's therapy data.
 - **Abuse protection:** lockout after 5 wrong passwords/PINs (15 min), per-IP and per-account rate limits,
   signup and password-reset responses that never reveal whether an email is registered, and codes stored only as HMACs.
 - **Rate limiter:** in memory, so it is per process. Run a single API process, or swap in a shared store
@@ -106,13 +108,46 @@ tests/               unit tests; tests/db/ needs PostgreSQL
 | Create, edit, delete goals | yes | no | no | no |
 | Invite / remove therapists | yes | no | can decline or leave | no |
 | Accept an invitation | no | no | admin-approved therapists | no |
+| Read therapist notes and learning plans | yes | no | yes, each read audited | no |
+| Write therapist notes and learning plans | no | no | yes (notes: edit and delete only their own) | no |
 
 - **Therapist links:** `pending` (invited) → `active` (accepted) → `revoked` (removed by either side). Only
   `active` links give access. A revoked therapist can be invited again.
 - **Child sign-in:** usernames are unique across all families (3–30 characters, starting with a letter). PINs are 4–8 digits,
   with obvious ones (1111, 1234, 9876) refused. Changing or removing the login signs the child out everywhere.
 - **Goal progress** (`current_value`) is read-only here; it will be computed from game sessions in Phase 6.
-- **Deleting a child** permanently removes their sessions, goals, links and progress (database cascade).
+- **Deleting a child** permanently removes their sessions, goals, links, progress, notes and learning plans
+  (database cascade).
+
+## Therapist notes and learning plans
+
+Written by therapists with an **active link** and an **admin-approved** account; read by the **parent** and those
+therapists. The child can't read them (403), because notes are clinical and written for adults. Everyone else gets
+404. Every write is audit-logged, and so is every therapist read.
+
+| Endpoint (`/api/children/{id}/...`) | Who | What |
+|---|---|---|
+| `GET notes?limit=50&before=...` | parent, linked therapist | newest first; for the next page pass the oldest `created_at` you have as `before` |
+| `POST notes` `{body}` | linked therapist | write a note (1–5,000 characters) |
+| `PATCH notes/{note_id}` `{body}`, `DELETE notes/{note_id}` | the note's author | change or delete your own note; anyone else gets 403 `not_note_author` |
+| `GET learning-plans?active=true\|false` | parent, linked therapist | the active plan first, then archived ones, newest first |
+| `GET learning-plans/active` | same | the plan in use now; 404 `no_active_plan` if there isn't one |
+| `GET learning-plans/{plan_id}` | same | one plan, active or archived |
+| `POST learning-plans` `{title, notes?, items?}` | linked therapist | start a new plan; it becomes active and the previous plan is archived |
+| `PATCH learning-plans/{plan_id}` | linked therapist | change the active plan's `title`, `notes` or `items` (`items` replaces the whole list) |
+| `POST learning-plans/{plan_id}/archive` | linked therapist | end the active plan without starting a new one |
+
+- **Notes:** only the author can change or delete a note. When a therapist's link is removed, they lose access, but
+  their notes stay visible to the parent.
+- **One active plan per child.** Any linked therapist can edit it (it is the child's shared plan; `created_by` shows
+  who started it). Archived plans are kept unchanged as history: changing one gives 409 `plan_archived`. Plans are
+  archived, never deleted. If two therapists start a plan at the same moment, one gets 409 `plan_changed`.
+- **Plan items:** `{game, sessions_per_week, difficulty?, notes?}`, where `game` is a game slug. The game must be in
+  the catalogue and active (otherwise 404 `game_not_found` with the unknown slugs in `details`). Each game appears at
+  most once, with at most 20 items and 1–21 sessions per week. Items come back in catalogue order with the game's slug,
+  title and category.
+- **`difficulty`** (`easy` / `medium` / `hard`) is the therapist's suggestion only. The child's level is still set by the
+  adaptive engine.
 
 ## Therapy game engine
 
