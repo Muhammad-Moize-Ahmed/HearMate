@@ -9,9 +9,11 @@ from app.auth.deps import require_approved_therapist
 from app.auth.policies import (
     can_edit_child,
     can_manage_plan,
+    can_read_plan,
     can_view_child,
     get_editable_child,
     get_plan_managed_child,
+    get_plan_readable_child,
     get_viewable_child,
 )
 from app.auth.principal import Principal, PrincipalKind
@@ -130,6 +132,45 @@ def test_parents_can_view_but_not_manage_plans(
     assert get_editable_child(db_session, as_principal(parent), child.id) == child
     with pytest.raises(PermissionDeniedError):
         get_plan_managed_child(db_session, as_principal(parent), child.id)
+
+
+@pytest.mark.parametrize(
+    ("approved", "link_status", "expected"),
+    [
+        (True, TherapistLinkStatus.ACTIVE, True),
+        (True, TherapistLinkStatus.PENDING, False),
+        (True, TherapistLinkStatus.REVOKED, False),
+        (False, TherapistLinkStatus.ACTIVE, False),
+    ],
+)
+def test_only_managing_therapists_read_plans(
+    db_session: Session,
+    child: Child,
+    approved: bool,
+    link_status: TherapistLinkStatus,
+    expected: bool,
+) -> None:
+    therapist = make_therapist(db_session)
+    link_therapist(db_session, therapist, child, link_status)
+
+    assert can_read_plan(db_session, as_principal(therapist, approved=approved), child) is expected
+
+
+def test_the_parent_reads_plans_but_not_the_child_or_others(
+    db_session: Session, parent: User, child: Child
+) -> None:
+    sibling = make_child(db_session, parent)
+    admin = make_user(db_session, role=UserRole.ADMIN)
+
+    assert can_read_plan(db_session, as_principal(parent), child)
+    assert not can_read_plan(db_session, Principal(kind=PrincipalKind.CHILD, id=child.id), child)
+    assert not can_read_plan(db_session, as_principal(make_user(db_session)), child)
+    assert not can_read_plan(db_session, as_principal(admin), child)
+    assert get_plan_readable_child(db_session, as_principal(parent), sibling.id) == sibling
+    with pytest.raises(PermissionDeniedError):
+        get_plan_readable_child(
+            db_session, Principal(kind=PrincipalKind.CHILD, id=child.id), child.id
+        )
 
 
 def test_require_approved_therapist() -> None:

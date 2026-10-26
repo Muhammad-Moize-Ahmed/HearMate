@@ -93,6 +93,18 @@ def link_therapist(
     return link
 
 
+def make_linked_therapist(
+    session: Session,
+    child: Child,
+    link: TherapistLinkStatus = TherapistLinkStatus.ACTIVE,
+    approval: TherapistApprovalStatus = TherapistApprovalStatus.APPROVED,
+    **overrides: Any,
+) -> User:
+    therapist = make_therapist(session, status=approval, **overrides)
+    link_therapist(session, therapist, child, link)
+    return therapist
+
+
 def make_game(session: Session, **overrides: Any) -> Game:
     values: dict[str, Any] = {
         "slug": f"game-{uuid.uuid4().hex[:8]}",

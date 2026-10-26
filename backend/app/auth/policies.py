@@ -53,6 +53,14 @@ def can_manage_plan(db: Session, principal: Principal, child: Child) -> bool:
     )
 
 
+def can_read_plan(db: Session, principal: Principal, child: Child) -> bool:
+    """Learning plans and therapist notes are read by the parent and the managing therapists.
+
+    Not the child: notes are clinical and written for adults.
+    """
+    return can_edit_child(principal, child) or can_manage_plan(db, principal, child)
+
+
 def get_viewable_child(db: Session, principal: Principal, child_id: uuid.UUID) -> Child:
     """404 (not 403) when the caller can't see the child, so IDs reveal nothing."""
     child = db.get(Child, child_id)
@@ -65,6 +73,13 @@ def get_editable_child(db: Session, principal: Principal, child_id: uuid.UUID) -
     child = get_viewable_child(db, principal, child_id)
     if not can_edit_child(principal, child):
         raise PermissionDeniedError("Only the child's parent can change this")
+    return child
+
+
+def get_plan_readable_child(db: Session, principal: Principal, child_id: uuid.UUID) -> Child:
+    child = get_viewable_child(db, principal, child_id)
+    if not can_read_plan(db, principal, child):
+        raise PermissionDeniedError("Learning plans and notes are for parents and therapists")
     return child
 
 
