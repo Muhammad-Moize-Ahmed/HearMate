@@ -1,0 +1,122 @@
+import logging
+import secrets
+from functools import lru_cache
+from pathlib import Path
+from typing import Annotated, Literal
+
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import URL, make_url
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+REPO_ROOT = BACKEND_DIR.parent
+
+# Later files win: the shared root .env (also used by docker compose), then backend/.env overrides.
+ENV_FILES = (REPO_ROOT / ".env", BACKEND_DIR / ".env")
+
+MIN_SECRET_KEY_LENGTH = 32
+
+logger = logging.getLogger(__name__)
+
+Environment = Literal["development", "test", "production"]
+LogFormat = Literal["json", "console"]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILES,
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    ENVIRONMENT: Environment = "development"
+    API_PREFIX: str = "/api"
+
+    # Signs tokens (Phase 2). Required in production; generated per process in development.
+    SECRET_KEY: SecretStr | None = None
+
+    # Either a full DATABASE_URL, or the POSTGRES_* parts shared with docker-compose.yml.
+    DATABASE_URL: SecretStr | None = None
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "hearmate"
+    POSTGRES_USER: str = "hearmate"
+    POSTGRES_PASSWORD: SecretStr | None = None
+    DB_POOL_SIZE: int = Field(default=5, ge=1)
+    DB_ECHO: bool = False
+
+    # Comma-separated in env, e.g. "http://localhost:5173,https://hearmate.app".
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: LogFormat | None = None
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def _upper_log_level(cls, value: str) -> str:
+        return value.upper()
+
+    @model_validator(mode="after")
+    def _check_production_safety(self) -> "Settings":
+        if self.ENVIRONMENT != "production":
+            return self
+
+        secret = self.SECRET_KEY.get_secret_value() if self.SECRET_KEY else ""
+        if len(secret) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be set to at least {MIN_SECRET_KEY_LENGTH} random characters "
+                'in production (e.g. python -c "import secrets; print(secrets.token_urlsafe(48))")'
+            )
+        if self.DATABASE_URL is None and self.POSTGRES_PASSWORD is None:
+            raise ValueError("DATABASE_URL or POSTGRES_PASSWORD must be set in production")
+        if "*" in self.CORS_ORIGINS:
+            raise ValueError("CORS_ORIGINS must list explicit origins in production, not '*'")
+        return self
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT == "production"
+
+    @property
+    def log_format(self) -> LogFormat:
+        if self.LOG_FORMAT is not None:
+            return self.LOG_FORMAT
+        return "json" if self.is_production else "console"
+
+    @property
+    def database_url(self) -> URL:
+        if self.DATABASE_URL is not None:
+            url = make_url(self.DATABASE_URL.get_secret_value())
+            # Always use the psycopg 3 driver, even for plain "postgresql://" URLs from a host.
+            if url.drivername in ("postgres", "postgresql"):
+                url = url.set(drivername="postgresql+psycopg")
+            return url
+        return URL.create(
+            drivername="postgresql+psycopg",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD.get_secret_value() if self.POSTGRES_PASSWORD else None,
+            host=self.POSTGRES_HOST,
+            port=self.POSTGRES_PORT,
+            database=self.POSTGRES_DB,
+        )
+
+    def secret_key(self) -> str:
+        if self.SECRET_KEY is None:
+            # Only reachable outside production (see validator). Tokens die on restart.
+            generated = secrets.token_urlsafe(48)
+            self.SECRET_KEY = SecretStr(generated)
+            logger.warning("SECRET_KEY not set; using a random key for this process only")
+        return self.SECRET_KEY.get_secret_value()
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

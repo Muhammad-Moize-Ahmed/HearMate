@@ -1,3 +1,44 @@
+# --- Secrets: never commit real env files (only *.env.example is tracked) ---
 .env
-node_modules/
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# --- OS / editors ---
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Frontend ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.eslintcache
+*.log
+
+# --- Backend ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Runtime data: user uploads, generated audio, model weights ---
+uploads/
+backend/media/
+backend/cache/
+*.wav
+*.pkl
+*.ckpt
+*.bin
