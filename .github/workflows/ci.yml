@@ -16,6 +16,8 @@ jobs:
   backend:
     name: Backend (lint, types, tests)
     runs-on: ubuntu-latest
+    # Normally ~2 min. A cap stops a stuck run from holding a runner for GitHub's 6-hour default.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -43,22 +45,33 @@ jobs:
       POSTGRES_PASSWORD: ci-throwaway
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      # An exact version: setup-uv stopped publishing floating major tags (v8+). v7+ runs on Node 24.
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           enable-cache: true
+      # Run #8 spent 20 min here on a crawling apt mirror. Skip if the image already has ffmpeg,
+      # retry flaky downloads, and give up after 5 min (re-run the job) instead of waiting.
       - name: Install ffmpeg (audio decoding for speech tests)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 5
+        run: |
+          if command -v ffmpeg >/dev/null; then ffmpeg -version | head -n 1; exit 0; fi
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg
       - run: uv sync --locked
+        timeout-minutes: 5
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run alembic upgrade head
       - run: uv run alembic check
       - run: uv run pytest
+        timeout-minutes: 8
 
   frontend:
     name: Frontend (lint, types, tests, build)
     runs-on: ubuntu-latest
+    # Normally under 1 min.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -74,15 +87,19 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+        timeout-minutes: 5
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+        timeout-minutes: 5
       - run: pnpm build
 
   secrets:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
+    # Normally ~10 s.
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
         with:
