@@ -1,6 +1,5 @@
 """Stimulus audio and spoken answers, with fake STT/TTS (no models) and real ffmpeg."""
 
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,7 @@ from tests.conftest import AuthHeaders
 from tests.factories import make_child, make_user
 from tests.fakes import FakeStt, FakeTts, tone_wav
 
-pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+pytestmark = pytest.mark.usefixtures("ffmpeg")  # skips locally, fails in CI
 
 SESSIONS = "/api/sessions"
 

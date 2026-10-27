@@ -19,6 +19,7 @@ from app.main import create_app
 from app.providers.speech import SpeechServices
 from app.providers.speech.cache import TtsCache
 from tests.fakes import FakeStt, FakeTts, RecordingEmailSender
+from tests.ffmpeg import find_ffmpeg
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -95,6 +96,12 @@ def db_session(migrated_engine: Engine) -> Iterator[Session]:
         finally:
             session.close()
             transaction.rollback()
+
+
+@pytest.fixture
+def ffmpeg() -> str:
+    """Path to ffmpeg. Missing: skip, or fail when HEARMATE_REQUIRE_FFMPEG=1 (CI)."""
+    return find_ffmpeg()
 
 
 @pytest.fixture

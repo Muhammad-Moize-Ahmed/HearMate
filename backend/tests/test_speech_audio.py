@@ -21,7 +21,7 @@ from app.providers.speech.audio import (
 )
 from tests.fakes import tone_wav
 
-pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+pytestmark = pytest.mark.usefixtures("ffmpeg")  # skips locally, fails in CI
 
 
 def encode(tmp_path: Path, extension: str, codec: str, seconds: float = 1.0) -> bytes:

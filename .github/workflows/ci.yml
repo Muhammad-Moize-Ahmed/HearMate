@@ -43,6 +43,8 @@ jobs:
       POSTGRES_DB: hearmate
       POSTGRES_USER: hearmate
       POSTGRES_PASSWORD: ci-throwaway
+      # The audio tests fail (instead of skipping) if the ffmpeg install step didn't work.
+      HEARMATE_REQUIRE_FFMPEG: "1"
     steps:
       - uses: actions/checkout@v5
       # An exact version: setup-uv stopped publishing floating major tags (v8+). v7+ runs on Node 24.
