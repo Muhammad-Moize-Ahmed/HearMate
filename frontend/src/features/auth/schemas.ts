@@ -4,7 +4,7 @@ import { z } from 'zod';
 export const MIN_PASSWORD_LENGTH = 10;
 const MAX_PASSWORD_LENGTH = 128;
 
-const email = z
+export const email = z
   .string()
   .trim()
   .min(1, 'Please enter your email address.')

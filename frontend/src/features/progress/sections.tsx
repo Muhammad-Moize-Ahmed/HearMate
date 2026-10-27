@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { formatDate, formatDateSpan, formatDay } from '../../lib/dates';
+import { useChildArea } from '../children/paths';
 import type { Game } from '../play/api';
 import { achievementEmoji } from '../play/meta';
 import type { Achievement, Summary } from './api';
@@ -217,18 +218,22 @@ export function GoalsProgress({
   goals: Summary['active_goals'];
   childId: string;
 }) {
+  // Goals are set by the parent; a therapist sees them but has nowhere to set one.
+  const { isParent, childPath } = useChildArea();
   return (
     <section className="break-inside-avoid rounded-[2rem] bg-white p-5 shadow-sm ring-2 ring-brand-100 sm:p-6 print:rounded-none print:p-0 print:shadow-none print:ring-0">
       <h2 className="text-xl font-black">Goals</h2>
       {goals.length === 0 ? (
         <p className="mt-3 text-ink-soft">
           No active goals.{' '}
-          <Link
-            to={`/parent/children/${childId}`}
-            className="font-bold text-brand-700 underline print:hidden"
-          >
-            Set one on the profile page
-          </Link>
+          {isParent && (
+            <Link
+              to={childPath(childId)}
+              className="font-bold text-brand-700 underline print:hidden"
+            >
+              Set one on the profile page
+            </Link>
+          )}
         </p>
       ) : (
         <ul className="mt-3 flex flex-col gap-4">

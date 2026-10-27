@@ -21,8 +21,8 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 7b | Parent dashboard, child profiles and sign-in (username + PIN), goals | ✅ done |
 | 7c | Child play area and game player: all 5 games, microphone answers, results | ✅ done |
 | 7d | Progress charts, printable reports, the child's "My progress", route-based code splitting | ✅ done |
-| 7e+ | Frontend: care team, therapist and admin screens | ⏳ next |
-| 8–9 | PWA/offline, deploy | planned |
+| 7e | Care team (invite/revoke per child), therapist dashboard, notes and learning plans, admin approvals | ✅ done |
+| 8–9 | PWA/offline, deploy | ⏳ next |
 
 ## Tech stack
 
@@ -103,7 +103,10 @@ src/
   features/          auth/ (login, sign up, verify email, forgot password), children/ (parent dashboard,
                      child form, child page, child sign-in), goals/, play/ (child home, game player,
                      answers, microphone recording, results), progress/ (parent progress + report,
-                     the child's "My progress", range filter, data transforms, charts/), home/, landing/
+                     the child's "My progress", range filter, data transforms, charts/), careTeam/
+                     (parent invites/removes therapists; therapist link queries), notes/, plans/
+                     (learning plans), therapist/ (dashboard, linked-child gate, child page),
+                     admin/ (approvals, therapist accounts), home/, landing/
   components/ui/     Button/LinkButton, TextField/PasswordField, fields (select, textarea, chips, segmented),
                      Alert, ConfirmDialog, ProgressBar, CodeInput, PinPad, Logo, Spinner
   lib/               avatars, dates (date-only values), useCooldown
@@ -124,7 +127,9 @@ src/
 | `/play` | children | game tiles with the child's level per skill, and their streak |
 | `/play/games/:slug` (`?session=` to resume) | children | the game player: intro, rounds, feedback, results |
 | `/play/progress` | children | "My progress": stars, best games, this week, badges, brothers and sisters this week |
-| `/therapist`, `/admin` | that kind of account only | role areas (home pages for now) |
+| `/therapist` | therapists | waiting-for-approval state; once approved: invitations (accept / decline) and linked children |
+| `/therapist/children/:id` (`/progress`, `/report`) | approved therapists with an **active** link to that child | learning plan, notes, profile; the same progress and report pages as parents; leave the care team |
+| `/admin` (`?q=&status=`) | admins | counts, therapists waiting for approval (approve / reject with a reason), therapist accounts with search and status filter |
 
 - **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
   httpOnly cookie restores the sign-in. Because the backend ends the whole sign-in if a refresh token is used twice,
@@ -147,6 +152,18 @@ src/
   - **Missing audio:** if a Sound Detective file isn't installed (see the backend README, `SOUNDS_DIR`), the round
     says so and lets the child pick another game; the session is abandoned, so levels aren't affected.
   - Children never request therapist notes or learning plans (the backend refuses them to children too).
+- **Care team:** on a child's page the parent invites a therapist by email, sees "Invited" or "Has access", and can
+  cancel an invitation or remove access (with a confirmation). The same page shows the child's learning plans and
+  therapist notes, read-only.
+- **Therapists:** until an admin approves the account, the dashboard shows only that state (with "Check again",
+  which fetches a fresh token) and requests no invitations or children. Every `/therapist/children/:id/...` page
+  sits behind `LinkedChildGate`: the page renders, and child data is requested, only if the therapist's own
+  links include an **active** link to that child. Otherwise it says there's no access and sends nothing about
+  the child (the backend answers 404 anyway). Therapists write notes and edit or delete only their own; they
+  start, edit (only changed fields are sent) and archive plans. Archived plans stay readable as history.
+- **Admin:** uses only the existing admin API (list, approve, reject therapists); counts, search and filters are
+  worked out in the browser from the therapist list. Rejecting or withdrawing approval needs a reason, which the
+  backend emails to the therapist. Admins never request children's data.
 - **Progress and reports:**
   - **Period:** Week, Month, 3 months or a custom range (7 days to a year, ending by today). It's kept in the URL, so
     a report can be reloaded or bookmarked as it is.
@@ -160,8 +177,9 @@ src/
     no ranking. It never requests the detailed report, therapist notes or learning plans.
 - **Code splitting:** every page except the landing page is a lazy route (`app/routes.tsx`). The first download
   is the shell: React, the router, TanStack Query, auth and layouts. Forms (zod, react-hook-form) and charts
-  (visx) load with the pages that use them. Main JS bundle: 583 kB → 362 kB minified (177 → 114 kB gzipped). The
-  charts chunk is 27 kB gzipped.
+  (visx) load with the pages that use them. Main JS bundle: 583 kB → 362 kB minified (177 → 114 kB gzipped) in 7d;
+  372 kB (117 kB gzipped) after 7e, which now also holds the JSX runtime that used to be a separate 9 kB chunk the
+  shell always loaded. The charts chunk is 27 kB gzipped; the therapist and admin pages are 2–3 kB gzipped each.
 - **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
   for PINs, emoji avatars, and animations switched off under "reduce motion".
 

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 
 import { describeError } from '../../api/client';
@@ -6,21 +6,13 @@ import { Alert } from '../../components/ui/Alert';
 import { Button, LinkButton } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { avatarEmoji } from '../../lib/avatars';
-import { formatDate } from '../../lib/dates';
+import { CareTeamSection } from '../careTeam/CareTeamSection';
 import { GoalsSection } from '../goals/GoalsSection';
+import { NotesSection } from '../notes/NotesSection';
+import { PlansSection } from '../plans/PlansSection';
 import { ChildLoginCard } from './ChildLoginCard';
 import { BackLink, ChildLoadError, Loading } from './common';
-import {
-  ATTENTION_LABELS,
-  ENVIRONMENT_LABELS,
-  FOCUS_LABELS,
-  GENDER_LABELS,
-  HEARING_LABELS,
-  INTEREST_LABELS,
-  labelFor,
-  LEARNING_STYLE_LABELS,
-  SPEECH_LABELS,
-} from './options';
+import { Card, Profile } from './ProfileDetails';
 import { useChild, useDeleteChild, useFamilyProgress, type Child } from './queries';
 
 export function ChildPage() {
@@ -82,24 +74,24 @@ export function ChildPage() {
         <GoalsSection childId={data.id} childName={name} />
       </Card>
 
+      <Card title="Care team" emoji="🩺">
+        <CareTeamSection childId={data.id} childName={name} />
+      </Card>
+
+      <Card title="Learning plan" emoji="🗺️">
+        <PlansSection childId={data.id} childName={name} canManage={false} />
+      </Card>
+
+      <Card title="Therapist notes" emoji="📝">
+        <NotesSection childId={data.id} childName={name} canWrite={false} />
+      </Card>
+
       <Card title={`About ${name}`} emoji="📋">
         <Profile child={data} />
       </Card>
 
       <DeleteChild child={data} />
     </div>
-  );
-}
-
-function Card({ title, emoji, children }: { title: string; emoji: string; children: ReactNode }) {
-  return (
-    <section className="rounded-[2rem] bg-white p-5 shadow-sm ring-2 ring-brand-100 sm:p-6">
-      <h2 className="mb-4 flex items-center gap-2 text-2xl font-black">
-        <span aria-hidden="true">{emoji}</span>
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
 
@@ -130,77 +122,6 @@ function ThisWeek({ childId }: { childId: string }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function Profile({ child }: { child: Child }) {
-  const rows: { label: string; value: ReactNode }[] = [
-    { label: 'Date of birth', value: formatDate(child.date_of_birth) },
-    { label: 'Gender', value: child.gender && labelFor(GENDER_LABELS, child.gender) },
-    {
-      label: 'Hard when listening',
-      value: <Tags keys={child.hearing_difficulties} labels={HEARING_LABELS} />,
-    },
-    {
-      label: 'Hard when speaking',
-      value: <Tags keys={child.speech_challenges} labels={SPEECH_LABELS} />,
-    },
-    { label: 'Working on', value: <Tags keys={child.focus_areas} labels={FOCUS_LABELS} /> },
-    { label: 'Loves', value: <Tags keys={child.interests} labels={INTEREST_LABELS} /> },
-    {
-      label: 'Session length',
-      value: child.session_length_minutes && `${child.session_length_minutes} minutes`,
-    },
-    {
-      label: 'Attention span',
-      value: child.attention_span && labelFor(ATTENTION_LABELS, child.attention_span),
-    },
-    {
-      label: 'Learns best by',
-      value:
-        child.preferred_learning_style &&
-        labelFor(LEARNING_STYLE_LABELS, child.preferred_learning_style),
-    },
-    {
-      label: 'Practises mostly',
-      value: child.learning_environment && labelFor(ENVIRONMENT_LABELS, child.learning_environment),
-    },
-    { label: 'Time zone', value: child.timezone?.replaceAll('_', ' ') ?? 'HearMate default' },
-    { label: 'Notes', value: child.notes },
-  ];
-  return (
-    <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(10rem,auto)_1fr]">
-      {rows.map((row) => (
-        <div key={row.label} className="contents">
-          <dt className="font-semibold">{row.label}</dt>
-          <dd className="-mt-3 whitespace-pre-line text-ink-soft sm:mt-0">
-            {row.value || 'Not set'}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function Tags({
-  keys,
-  labels,
-}: {
-  keys: string[];
-  labels: Record<string, string | [string, string]>;
-}) {
-  if (keys.length === 0) return null;
-  return (
-    <ul className="flex flex-wrap gap-1.5">
-      {keys.map((key) => (
-        <li
-          key={key}
-          className="rounded-full bg-brand-50 px-3 py-0.5 text-ink ring-1 ring-brand-100"
-        >
-          {labelFor(labels, key)}
-        </li>
-      ))}
-    </ul>
   );
 }
 

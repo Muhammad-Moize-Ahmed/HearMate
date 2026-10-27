@@ -5,6 +5,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button, LinkButton } from '../../components/ui/Button';
 import { formatDate } from '../../lib/dates';
 import { BackLink, ChildLoadError, Loading } from '../children/common';
+import { useChildArea } from '../children/paths';
 import { useChild } from '../children/queries';
 import { useGames } from '../play/api';
 import { useAchievements, useSummary, useTrend } from './api';
@@ -20,7 +21,7 @@ import {
   StreakHistory,
 } from './sections';
 
-/** A parent's view of one child's progress over a chosen period, as charts. */
+/** A parent's (or linked therapist's) view of one child's progress over a period, as charts. */
 export function ProgressPage() {
   const { childId = '' } = useParams();
   const [range, setRange] = useRange('month');
@@ -29,6 +30,8 @@ export function ProgressPage() {
   const trend = useTrend(childId, range);
   const achievements = useAchievements(childId);
   const games = useGames();
+  const { childPath } = useChildArea();
+  const base = childPath(childId);
 
   if (child.isPending) return <Loading label="Loading progress…" />;
   if (child.isError) return <ChildLoadError error={child.error} />;
@@ -38,7 +41,7 @@ export function ProgressPage() {
     <div className="flex flex-col gap-6">
       <title>{`${name}'s progress · HearMate`}</title>
       <div>
-        <BackLink to={`/parent/children/${childId}`}>{`${name}'s profile`}</BackLink>
+        <BackLink to={base}>{`${name}'s profile`}</BackLink>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-3xl font-black sm:text-4xl">{name}'s progress</h1>
@@ -48,7 +51,7 @@ export function ProgressPage() {
               </p>
             )}
           </div>
-          <LinkButton to={`/parent/children/${childId}/report`} variant="secondary">
+          <LinkButton to={`${base}/report`} variant="secondary">
             Detailed report
           </LinkButton>
         </div>

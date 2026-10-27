@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ApiError, describeError } from '../../api/client';
 import { Alert } from '../../components/ui/Alert';
 import { Spinner } from '../../components/ui/Spinner';
+import { useChildArea } from './paths';
 
 export function BackLink({ to, children }: { to: string; children: string }) {
   return (
@@ -26,9 +27,10 @@ export function Loading({ label }: { label: string }) {
 
 /** Why a child's page couldn't load; a 404 means it doesn't exist or isn't yours. */
 export function ChildLoadError({ error }: { error: Error }) {
+  const { home } = useChildArea();
   return (
     <div className="flex flex-col gap-4">
-      <BackLink to="/parent">All children</BackLink>
+      <BackLink to={home}>All children</BackLink>
       <Alert tone="error">
         {error instanceof ApiError && error.status === 404
           ? "We couldn't find that child. They may have been removed."

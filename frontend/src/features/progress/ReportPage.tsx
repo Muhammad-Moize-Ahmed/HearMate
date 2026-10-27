@@ -6,6 +6,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { formatDate, formatDay } from '../../lib/dates';
 import { BackLink, ChildLoadError, Loading } from '../children/common';
+import { useChildArea } from '../children/paths';
 import { useChild } from '../children/queries';
 import { useGames } from '../play/api';
 import { soundLetters, TIER_LABEL } from '../play/meta';
@@ -37,6 +38,7 @@ export function ReportPage() {
   const report = useReport(childId, range);
   const trend = useTrend(childId, range);
   const games = useGames();
+  const { childPath } = useChildArea();
 
   if (child.isPending) return <Loading label="Loading report…" />;
   if (child.isError) return <ChildLoadError error={child.error} />;
@@ -46,7 +48,7 @@ export function ReportPage() {
     <div className="flex flex-col gap-6 print:gap-5">
       <title>{`${name}'s report · HearMate`}</title>
       <div className="print:hidden">
-        <BackLink to={`/parent/children/${childId}/progress`}>{`${name}'s progress`}</BackLink>
+        <BackLink to={`${childPath(childId)}/progress`}>{`${name}'s progress`}</BackLink>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="text-3xl font-black sm:text-4xl">{name}'s report</h1>
           <Button onClick={() => window.print()} disabled={!report.data}>

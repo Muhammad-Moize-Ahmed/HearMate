@@ -132,9 +132,40 @@ export const routes: RouteObject[] = [
           {
             index: true,
             lazy: page(
-              () => import('../features/home/HomePages'),
-              (m) => m.TherapistHome,
+              () => import('../features/therapist/TherapistDashboard'),
+              (m) => m.TherapistDashboard,
             ),
+          },
+          {
+            // Only children with an active link to this therapist; see LinkedChildGate.
+            path: 'children/:childId',
+            lazy: page(
+              () => import('../features/therapist/LinkedChildGate'),
+              (m) => m.LinkedChildGate,
+            ),
+            children: [
+              {
+                index: true,
+                lazy: page(
+                  () => import('../features/therapist/TherapistChildPage'),
+                  (m) => m.TherapistChildPage,
+                ),
+              },
+              {
+                path: 'progress',
+                lazy: page(
+                  () => import('../features/progress/ProgressPage'),
+                  (m) => m.ProgressPage,
+                ),
+              },
+              {
+                path: 'report',
+                lazy: page(
+                  () => import('../features/progress/ReportPage'),
+                  (m) => m.ReportPage,
+                ),
+              },
+            ],
           },
         ],
       },
@@ -151,8 +182,8 @@ export const routes: RouteObject[] = [
           {
             index: true,
             lazy: page(
-              () => import('../features/home/HomePages'),
-              (m) => m.AdminHome,
+              () => import('../features/admin/AdminDashboard'),
+              (m) => m.AdminDashboard,
             ),
           },
         ],

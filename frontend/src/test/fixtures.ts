@@ -62,7 +62,7 @@ export function goalOut(overrides: Partial<S['GoalOut']> = {}): S['GoalOut'] {
 type Routes = Parameters<typeof mockApi>[0];
 
 /**
- * A signed-in parent with one child (Ali) and no goals; pass routes to add or override. The
+ * A signed-in parent with one child (Ali) and no goals, therapists, plans or notes; pass routes to add or override. The
  * child's GET returns `child`, so tests can change what later fetches see.
  */
 export function mockParentApi(routes: Routes = {}, child = childOut()) {
@@ -72,6 +72,9 @@ export function mockParentApi(routes: Routes = {}, child = childOut()) {
     [`GET /api/children/${child.id}`]: { body: child },
     'GET /api/family/progress': { body: [weekOut({ child_id: child.id })] },
     [`GET /api/children/${child.id}/goals`]: { body: [] },
+    [`GET /api/children/${child.id}/therapists`]: { body: [] },
+    [`GET /api/children/${child.id}/learning-plans`]: { body: [] },
+    [`GET /api/children/${child.id}/notes`]: { body: [] },
     ...routes,
   });
 }
