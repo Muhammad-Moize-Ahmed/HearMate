@@ -52,9 +52,17 @@ export function ChildPage() {
               {data.age_years} {data.age_years === 1 ? 'year' : 'years'} old
             </p>
           </div>
-          <LinkButton to={`/parent/children/${data.id}/edit`} variant="secondary">
-            Edit profile
-          </LinkButton>
+          <div className="flex flex-wrap gap-2">
+            <LinkButton to={`/parent/children/${data.id}/progress`}>
+              <span aria-hidden="true">📈</span> Progress
+            </LinkButton>
+            <LinkButton to={`/parent/children/${data.id}/report`} variant="secondary">
+              Report
+            </LinkButton>
+            <LinkButton to={`/parent/children/${data.id}/edit`} variant="secondary">
+              Edit profile
+            </LinkButton>
+          </div>
         </div>
       </div>
 

@@ -78,6 +78,19 @@ def test_production_refuses_unsafe_configuration(
         make_settings(**(values | overrides))
 
 
+def test_path_settings_expand_the_home_directory(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", "/home/tester")
+    monkeypatch.setenv("SOUNDS_DIR", "~/.cache/hearmate/sounds")
+
+    settings = make_settings(PIPER_VOICE_DIR="~/voices", TTS_CACHE_DIR="/srv/tts")
+
+    assert str(settings.SOUNDS_DIR) == "/home/tester/.cache/hearmate/sounds"
+    assert str(settings.PIPER_VOICE_DIR) == "/home/tester/voices"
+    assert str(settings.TTS_CACHE_DIR) == "/srv/tts"
+    monkeypatch.delenv("SOUNDS_DIR")
+    assert make_settings().SOUNDS_DIR is None
+
+
 def test_production_accepts_a_safe_configuration() -> None:
     settings = make_settings(**(PRODUCTION_BASE | {"SECRET_KEY": STRONG_SECRET}))
 

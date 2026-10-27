@@ -1,6 +1,6 @@
 /**
  * A fake backend for tests: stubs `fetch` and answers by "METHOD /path". Unhandled requests fail
- * the test loudly. Every call is recorded with its parsed JSON body and headers.
+ * the test loudly. Every call is recorded with its query, parsed JSON body and headers.
  */
 type Reply = { status?: number; body?: unknown };
 type Handler = (call: RecordedCall) => Reply | Promise<Reply>;
@@ -8,6 +8,7 @@ type Handler = (call: RecordedCall) => Reply | Promise<Reply>;
 export type RecordedCall = {
   method: string;
   path: string;
+  query: URLSearchParams;
   body: unknown;
   headers: Headers;
 };
@@ -62,6 +63,7 @@ export function mockApi(routes: Record<string, Handler | Reply>) {
     const call: RecordedCall = {
       method: request.method,
       path: url.pathname,
+      query: url.searchParams,
       body: text ? parseBody(text) : undefined,
       headers: request.headers,
     };

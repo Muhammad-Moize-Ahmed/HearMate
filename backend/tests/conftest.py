@@ -31,7 +31,8 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 @pytest.fixture(scope="session")
 def test_settings() -> Settings:
-    return Settings(ENVIRONMENT="test", LOG_FORMAT="console")
+    # The developer's .env supplies the database; their installed sound files must not leak in.
+    return Settings(ENVIRONMENT="test", LOG_FORMAT="console", SOUNDS_DIR=None)
 
 
 @pytest.fixture(scope="session")

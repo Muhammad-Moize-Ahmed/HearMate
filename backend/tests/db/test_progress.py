@@ -1,4 +1,5 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -12,6 +13,7 @@ from app.db.models import (
     DailyActivity,
     Goal,
     GoalStatus,
+    LevelHistory,
     SkillCategory,
     User,
     UserRole,
@@ -217,6 +219,100 @@ def test_trend_has_one_entry_per_day(
     assert trend[-1]["date"] == today_in(KARACHI).isoformat()
     assert (trend[-1]["sessions"], trend[-1]["average_accuracy"]) == (1, 100.0)
     assert all(day["sessions"] == 0 for day in trend[:-1])
+
+
+def test_trend_breaks_each_day_down_by_game(
+    db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
+) -> None:
+    play_game(db_client, db_session, headers, child, "sound-detective")
+    play_game(db_client, db_session, headers, child, "sound-detective", correct=0)
+    play_game(db_client, db_session, headers, child, "word-sequence", correct=3)
+
+    trend = db_client.get(f"/api/children/{child.id}/progress/trend?days=7", headers=headers).json()
+
+    assert trend[-1]["games"] == [
+        {
+            "game": "sound-detective",
+            "category": "listening",
+            "sessions": 2,
+            "average_accuracy": 50.0,
+        },
+        {"game": "word-sequence", "category": "memory", "sessions": 1, "average_accuracy": 50.0},
+    ]
+    assert all(day["games"] == [] for day in trend[:-1])
+
+
+def test_trend_shows_the_level_in_each_skill_at_the_end_of_each_day(
+    db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
+) -> None:
+    set_level(db_session, child, SkillCategory.LISTENING, 4)
+    three_days_ago = datetime.combine(today_in(KARACHI) - timedelta(days=3), time(12), KARACHI)
+    db_session.add_all(
+        [
+            LevelHistory(
+                child_id=child.id,
+                category=SkillCategory.LISTENING,
+                old_level=2,
+                new_level=3,
+                reason="up",
+                created_at=three_days_ago,
+            ),
+            LevelHistory(
+                child_id=child.id,
+                category=SkillCategory.LISTENING,
+                old_level=3,
+                new_level=4,
+                reason="up",
+            ),
+        ]
+    )
+    db_session.flush()
+
+    trend = db_client.get(f"/api/children/{child.id}/progress/trend?days=7", headers=headers).json()
+
+    def levels(day: dict[str, Any]) -> dict[str, int]:
+        return {entry["category"]: entry["level"] for entry in day["levels"]}
+
+    assert [levels(day)["listening"] for day in trend] == [2, 2, 2, 3, 3, 3, 4]
+    assert levels(trend[0]) == {"listening": 2, "speech": 1, "memory": 1}
+
+    # A period ending yesterday still undoes today's change.
+    yesterday = (today_in(KARACHI) - timedelta(days=1)).isoformat()
+    url = f"/api/children/{child.id}/progress/trend?days=7&end={yesterday}"
+    earlier = db_client.get(url, headers=headers).json()
+    assert [levels(day)["listening"] for day in earlier] == [2, 2, 2, 2, 3, 3, 3]
+
+
+def test_a_period_can_end_on_an_earlier_day(
+    db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
+) -> None:
+    play_game(db_client, db_session, headers, child, "similar-sounds")
+    today = today_in(KARACHI)
+    base = f"/api/children/{child.id}"
+
+    yesterday = (today - timedelta(days=1)).isoformat()
+    summary = db_client.get(f"{base}/progress?days=7&end={yesterday}", headers=headers).json()
+    trend = db_client.get(f"{base}/progress/trend?days=7&end={yesterday}", headers=headers).json()
+    report = db_client.get(f"{base}/report?days=7&end={yesterday}", headers=headers).json()
+
+    assert summary["period"] == {
+        "start": (today - timedelta(days=7)).isoformat(),
+        "end": yesterday,
+        "days": 7,
+        "timezone": "Asia/Karachi",
+    }
+    assert summary["in_period"]["sessions"] == 0
+    assert summary["current_streak"] == 1  # streaks are always as of today
+    assert [day["date"] for day in trend][-1] == yesterday
+    assert all(day["sessions"] == 0 for day in trend)
+    assert report["games"] == []
+    assert report["level_changes"] == []
+
+    # A period can't end in the future: it ends today instead.
+    tomorrow = (today + timedelta(days=1)).isoformat()
+    later = db_client.get(f"{base}/report?days=7&end={tomorrow}", headers=headers).json()
+    assert later["summary"]["period"]["end"] == today.isoformat()
+    assert [g["slug"] for g in later["games"]] == ["similar-sounds"]
 
 
 def test_the_period_is_validated(

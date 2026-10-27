@@ -187,7 +187,8 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
   as null. Word Sequence prompts include `answer_length` (how many words to tap). `GET /api/speech/status` is
   typed too (`SpeechStatusOut`).
 - **Not included:** sound-effect files for Sound Detective (the other four games use the TTS voice and generated
-  noise). Put licensed files (e.g. CC0) in `SOUNDS_DIR` (e.g. `SOUNDS_DIR=~/.cache/hearmate/sounds` in `.env`),
+  noise). Put licensed files (e.g. CC0) in `SOUNDS_DIR` (e.g. `SOUNDS_DIR=~/.cache/hearmate/sounds` in `.env`; a leading
+  `~` is expanded in settings, as for `PIPER_VOICE_DIR` and `TTS_CACHE_DIR`),
   named `<sound_id>.wav|.mp3|.ogg`, using the 24 ids in `content/bank.json` (`dog`, `cat`, `cow`, `duck`, `lion`,
   `frog`, `bird`, `car_horn`, `train`, `airplane`, `bicycle_bell`, `ambulance`, `doorbell`, `phone`, `clock`, `vacuum`,
   `tap`, `rain`, `thunder`, `wind`, `drum`, `piano`, `guitar`, `bell`). Any sample rate, mono or stereo (decoded to
@@ -247,11 +248,14 @@ straight away. Abandoned sessions don't count.
 | Endpoint (`/api/...`) | Who | What |
 |---|---|---|
 | `children/{id}/progress?days=30` | anyone who can see the child | totals (all time and period), streaks, level + accuracy + trend per skill, recent level changes, active goals |
-| `children/{id}/progress/trend?days=30` | same | one point per local day, for charts |
+| `children/{id}/progress/trend?days=30` | same | one point per local day, for charts: totals, average accuracy, `games` (sessions and accuracy per game that day) and `levels` (the level in each skill at the end of the day) |
 | `children/{id}/report?days=30` | parent, linked therapist (audited) | the above, plus per-game results, **accuracy by noise level** (quiet / moderate / loud), **speech sounds to practise**, **hardest minimal-pair contrasts**, level changes |
 | `children/{id}/achievements` | anyone who can see the child | the full badge list, with unlock dates |
 | `children/{id}/personal-bests` | same | best accuracy, points and level per game |
 | `family/progress` | parent, or a child (their siblings) | this week, side by side, siblings only |
+
+**Periods:** `days` (7-365) counts back from `end`, an optional date that defaults to the child's today (a later
+date is treated as today), so `?days=14&end=2026-10-14` covers 1-14 October. Streaks are always as of today.
 
 **No leaderboards across families:** children compete with their own personal bests, and the only comparison is
 between siblings. Therapist views of progress and reports are written to the audit log.

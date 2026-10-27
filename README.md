@@ -20,13 +20,15 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 7a | Frontend foundations (router, API types, role layouts, guards) and sign-in screens | ✅ done |
 | 7b | Parent dashboard, child profiles and sign-in (username + PIN), goals | ✅ done |
 | 7c | Child play area and game player: all 5 games, microphone answers, results | ✅ done |
-| 7d+ | Frontend: progress reports, care team, therapist and admin screens | ⏳ next |
+| 7d | Progress charts, printable reports, the child's "My progress", route-based code splitting | ✅ done |
+| 7e+ | Frontend: care team, therapist and admin screens | ⏳ next |
 | 8–9 | PWA/offline, deploy | planned |
 
 ## Tech stack
 
 - **Frontend:** React 19, TypeScript (strict), Vite, Tailwind CSS v4, React Router 7, TanStack Query 5,
-  openapi-fetch + openapi-typescript (API types generated from the backend), react-hook-form + zod;
+  openapi-fetch + openapi-typescript (API types generated from the backend), react-hook-form + zod,
+  visx (scale, shape, axis, group) for SVG charts;
   Vitest + Testing Library, ESLint + Prettier
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 17 (psycopg 3), pydantic-settings; pytest, ruff, mypy (strict)
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for Python, [pnpm](https://pnpm.io/) for Node, Docker Compose, pre-commit + gitleaks, GitHub Actions
@@ -100,11 +102,12 @@ src/
   auth/              session (in-memory tokens + refresh), AuthProvider, route guards, post-sign-in redirects
   features/          auth/ (login, sign up, verify email, forgot password), children/ (parent dashboard,
                      child form, child page, child sign-in), goals/, play/ (child home, game player,
-                     answers, microphone recording, results), home/ (other role homes), landing/
+                     answers, microphone recording, results), progress/ (parent progress + report,
+                     the child's "My progress", range filter, data transforms, charts/), home/, landing/
   components/ui/     Button/LinkButton, TextField/PasswordField, fields (select, textarea, chips, segmented),
                      Alert, ConfirmDialog, ProgressBar, CodeInput, PinPad, Logo, Spinner
   lib/               avatars, dates (date-only values), useCooldown
-  test/              mockApi (fake backend for tests), fixtures (a signed-in parent with a child), renderApp
+  test/              mockApi (fake backend for tests), fixtures (parent, play, progress), renderApp
 ```
 
 | Path | Who | |
@@ -116,8 +119,11 @@ src/
 | `/parent` | parents | dashboard: each child's week (games, minutes, streak) and sign-in status |
 | `/parent/children/new`, `/parent/children/:id/edit` | parents | child profile form |
 | `/parent/children/:id` | parents | the child's week, sign-in (username + PIN), goals, profile, delete |
+| `/parent/children/:id/progress` (`?range=week\|month\|quarter\|custom&from=&to=`) | parents | charts: scores per skill or game, levels, games per day/week, streaks, goals, badges |
+| `/parent/children/:id/report` (same `?range=`) | parents | the detailed report, laid out to print or save as PDF |
 | `/play` | children | game tiles with the child's level per skill, and their streak |
 | `/play/games/:slug` (`?session=` to resume) | children | the game player: intro, rounds, feedback, results |
+| `/play/progress` | children | "My progress": stars, best games, this week, badges, brothers and sisters this week |
 | `/therapist`, `/admin` | that kind of account only | role areas (home pages for now) |
 
 - **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
@@ -141,6 +147,21 @@ src/
   - **Missing audio:** if a Sound Detective file isn't installed (see the backend README, `SOUNDS_DIR`), the round
     says so and lets the child pick another game; the session is abandoned, so levels aren't affected.
   - Children never request therapist notes or learning plans (the backend refuses them to children too).
+- **Progress and reports:**
+  - **Period:** Week, Month, 3 months or a custom range (7 days to a year, ending by today). It's kept in the URL, so
+    a report can be reloaded or bookmarked as it is.
+  - **Charts** are SVG (visx). Each line has its own colour, marker shape and dash pattern, and is named in a
+    legend, so colour is never the only cue. Each chart has a text summary for screen readers and a "Show as a
+    table" view. Hovering or tapping shows the values. Up to a month, each point is a day; longer periods use
+    weeks. The colours are a categorical palette checked for colour-blind separation.
+  - **Printing:** "Print or save as PDF" uses the browser's print dialog, with no PDF library. Print styles hide
+    the header and controls, keep sections whole, and keep chart colours.
+  - **The child's page** compares a child only with themselves and their brothers and sisters, in name order with
+    no ranking. It never requests the detailed report, therapist notes or learning plans.
+- **Code splitting:** every page except the landing page is a lazy route (`app/routes.tsx`). The first download
+  is the shell: React, the router, TanStack Query, auth and layouts. Forms (zod, react-hook-form) and charts
+  (visx) load with the pages that use them. Main JS bundle: 583 kB → 362 kB minified (177 → 114 kB gzipped). The
+  charts chunk is 27 kB gzipped.
 - **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
   for PINs, emoji avatars, and animations switched off under "reduce motion".
 

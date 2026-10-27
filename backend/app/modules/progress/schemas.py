@@ -71,12 +71,26 @@ class ProgressSummaryOut(BaseModel):
     active_goals: list[GoalProgressOut]
 
 
+class GameDayOut(BaseModel):
+    game: str
+    category: SkillCategory
+    sessions: int
+    average_accuracy: float
+
+
+class DayLevelOut(BaseModel):
+    category: SkillCategory
+    level: int
+
+
 class DayOut(BaseModel):
     date: date
     sessions: int
     points: int
     minutes: int
     average_accuracy: float | None
+    games: list[GameDayOut] = Field(description="Completed sessions that day, per game")
+    levels: list[DayLevelOut] = Field(description="The level in each skill at the end of the day")
 
 
 class GameReportOut(BaseModel):

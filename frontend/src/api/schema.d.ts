@@ -1255,6 +1255,12 @@ export interface components {
              */
             text?: string | null;
         };
+        /** DayLevelOut */
+        DayLevelOut: {
+            category: components["schemas"]["SkillCategory"];
+            /** Level */
+            level: number;
+        };
         /** DayOut */
         DayOut: {
             /** Average Accuracy */
@@ -1264,6 +1270,16 @@ export interface components {
              * Format: date
              */
             date: string;
+            /**
+             * Games
+             * @description Completed sessions that day, per game
+             */
+            games: components["schemas"]["GameDayOut"][];
+            /**
+             * Levels
+             * @description The level in each skill at the end of the day
+             */
+            levels: components["schemas"]["DayLevelOut"][];
             /** Minutes */
             minutes: number;
             /** Points */
@@ -1335,6 +1351,16 @@ export interface components {
          * @enum {string}
          */
         FocusArea: "speech_clarity" | "listening_skills" | "vocabulary" | "pronunciation" | "conversation" | "attention_span" | "speaking_confidence";
+        /** GameDayOut */
+        GameDayOut: {
+            /** Average Accuracy */
+            average_accuracy: number;
+            category: components["schemas"]["SkillCategory"];
+            /** Game */
+            game: string;
+            /** Sessions */
+            sessions: number;
+        };
         /** GameOut */
         GameOut: {
             /**
@@ -3441,6 +3467,8 @@ export interface operations {
             query?: {
                 /** @description Length of the period, in the child's days */
                 days?: number;
+                /** @description Last day of the period (the child's today when left out or later) */
+                end?: string | null;
             };
             header?: never;
             path: {
@@ -3475,6 +3503,8 @@ export interface operations {
             query?: {
                 /** @description Length of the period, in the child's days */
                 days?: number;
+                /** @description Last day of the period (the child's today when left out or later) */
+                end?: string | null;
             };
             header?: never;
             path: {
@@ -3509,6 +3539,8 @@ export interface operations {
             query?: {
                 /** @description Length of the period, in the child's days */
                 days?: number;
+                /** @description Last day of the period (the child's today when left out or later) */
+                end?: string | null;
             };
             header?: never;
             path: {

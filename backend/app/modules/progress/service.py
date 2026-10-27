@@ -40,8 +40,10 @@ from .schemas import (
     AchievementOut,
     ChildReportOut,
     ContrastOut,
+    DayLevelOut,
     DayOut,
     FamilyMemberOut,
+    GameDayOut,
     GameReportOut,
     GoalProgressOut,
     LevelChangeOut,
@@ -73,64 +75,73 @@ class ProgressService:
 
     # ------------------------------------------------------------------ public views
 
-    def summary(self, child_id: uuid.UUID, days: int) -> ProgressSummaryOut:
+    def summary(
+        self, child_id: uuid.UUID, days: int, end: date | None = None
+    ) -> ProgressSummaryOut:
         child = get_viewable_child(self.db, self.principal, child_id)
-        result = self._summary(child, days)
+        result = self._summary(child, days, end)
         self._audit_therapist(child, "child_progress_viewed")
         return result
 
-    def trend(self, child_id: uuid.UUID, days: int) -> list[DayOut]:
+    def trend(self, child_id: uuid.UUID, days: int, end: date | None = None) -> list[DayOut]:
         """One entry per local day in the period (zeros on days without play), oldest first."""
         child = get_viewable_child(self.db, self.principal, child_id)
         zone = child_zone(child, self.settings)
-        start, _today = self._period(child, days)
+        start, last, _today = self._period(child, days, end)
         activity = {
             a.activity_date: a
             for a in self.db.scalars(
                 select(DailyActivity).where(
-                    DailyActivity.child_id == child.id, DailyActivity.activity_date >= start
+                    DailyActivity.child_id == child.id,
+                    DailyActivity.activity_date.between(start, last),
                 )
             )
         }
-        accuracy_by_day: dict[date, list[float]] = defaultdict(list)
-        for session, _game in self._completed(child, start_of_day(start, zone)):
+        sessions_by_day: dict[date, list[tuple[GameSession, Game]]] = defaultdict(list)
+        for session, game in self._completed(
+            child, start_of_day(start, zone), start_of_day(last + timedelta(days=1), zone)
+        ):
             assert session.completed_at is not None  # noqa: S101 - completed sessions
-            accuracy_by_day[local_date(session.completed_at, zone)].append(session.accuracy or 0)
+            sessions_by_day[local_date(session.completed_at, zone)].append((session, game))
+        levels = self._levels_by_day(child, start, last)
 
         series = []
         for offset in range(days):
             day = start + timedelta(days=offset)
             a = activity.get(day)
-            scores = accuracy_by_day.get(day)
+            played = sessions_by_day.get(day, [])
             series.append(
                 DayOut(
                     date=day,
                     sessions=a.sessions_completed if a else 0,
                     points=a.points_earned if a else 0,
                     minutes=(a.seconds_practised // 60) if a else 0,
-                    average_accuracy=_mean(scores),
+                    average_accuracy=_mean([s.accuracy or 0.0 for s, _ in played]),
+                    games=_games_on_day(played),
+                    levels=levels[day],
                 )
             )
         return series
 
-    def report(self, child_id: uuid.UUID, days: int) -> ChildReportOut:
+    def report(self, child_id: uuid.UUID, days: int, end: date | None = None) -> ChildReportOut:
         child = get_viewable_child(self.db, self.principal, child_id)
         if self.principal.is_child:
             raise PermissionDeniedError("Reports are for parents and therapists")
         zone = child_zone(child, self.settings)
-        start, _today = self._period(child, days)
+        start, last, _today = self._period(child, days, end)
         since = start_of_day(start, zone)
-        rows = self._completed(child, since)
+        until = start_of_day(last + timedelta(days=1), zone)
+        rows = self._completed(child, since, until)
         session_ids = [s.id for s, _ in rows]
 
         report = ChildReportOut(
             generated_at=datetime.now(UTC),
-            summary=self._summary(child, days),
+            summary=self._summary(child, days, end),
             games=self._games_report(rows),
             listening_in_noise=self._noise_bands(session_ids),
             speech=self._speech_report(session_ids),
             hardest_contrasts=self._contrasts(session_ids),
-            level_changes=self._level_changes(child, since=since),
+            level_changes=self._level_changes(child, since=since, until=until),
         )
         self._audit_therapist(child, "child_report_viewed")
         return report
@@ -230,10 +241,12 @@ class ProgressService:
 
     # ------------------------------------------------------------------ summary pieces
 
-    def _summary(self, child: Child, days: int) -> ProgressSummaryOut:
+    def _summary(self, child: Child, days: int, end: date | None) -> ProgressSummaryOut:
         zone = child_zone(child, self.settings)
-        start, today = self._period(child, days)
-        rows = self._completed(child, start_of_day(start, zone))
+        start, last, today = self._period(child, days, end)
+        rows = self._completed(
+            child, start_of_day(start, zone), start_of_day(last + timedelta(days=1), zone)
+        )
         play_dates = self._play_dates(child)
 
         all_time = self.db.execute(
@@ -256,7 +269,7 @@ class ProgressService:
 
         return ProgressSummaryOut(
             child_id=child.id,
-            period=PeriodOut(start=start, end=today, days=days, timezone=zone.key),
+            period=PeriodOut(start=start, end=last, days=days, timezone=zone.key),
             all_time=Totals(sessions=all_time[0], points=all_time[1], minutes=all_time[2] // 60),
             in_period=Totals(
                 sessions=len(rows),
@@ -305,7 +318,12 @@ class ProgressService:
         )
 
     def _level_changes(
-        self, child: Child, *, since: datetime | None = None, limit: int | None = None
+        self,
+        child: Child,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        limit: int | None = None,
     ) -> list[LevelChangeOut]:
         query = (
             select(LevelHistory)
@@ -314,6 +332,8 @@ class ProgressService:
         )
         if since is not None:
             query = query.where(LevelHistory.created_at >= since)
+        if until is not None:
+            query = query.where(LevelHistory.created_at < until)
         if limit is not None:
             query = query.limit(limit)
         return [
@@ -433,23 +453,61 @@ class ProgressService:
 
     # ------------------------------------------------------------------ helpers
 
-    def _period(self, child: Child, days: int) -> tuple[date, date]:
+    def _period(self, child: Child, days: int, end: date | None) -> tuple[date, date, date]:
+        """(first day, last day, today) in the child's calendar; periods never end after today."""
         today = local_date(datetime.now(UTC), child_zone(child, self.settings))
-        return today - timedelta(days=days - 1), today
+        last = min(end, today) if end is not None else today
+        return last - timedelta(days=days - 1), last, today
 
-    def _completed(self, child: Child, since: datetime) -> list[tuple[GameSession, Game]]:
-        return list(
-            self.db.execute(
-                select(GameSession, Game)
-                .join(Game, Game.id == GameSession.game_id)
-                .where(
-                    GameSession.child_id == child.id,
-                    GameSession.status == SessionStatus.COMPLETED,
-                    GameSession.completed_at >= since,
-                )
-                .order_by(GameSession.completed_at)
+    def _completed(
+        self, child: Child, since: datetime, until: datetime | None = None
+    ) -> list[tuple[GameSession, Game]]:
+        query = (
+            select(GameSession, Game)
+            .join(Game, Game.id == GameSession.game_id)
+            .where(
+                GameSession.child_id == child.id,
+                GameSession.status == SessionStatus.COMPLETED,
+                GameSession.completed_at >= since,
             )
+            .order_by(GameSession.completed_at)
         )
+        if until is not None:
+            query = query.where(GameSession.completed_at < until)
+        return list(self.db.execute(query))
+
+    def _levels_by_day(
+        self, child: Child, start: date, last: date
+    ) -> dict[date, list[DayLevelOut]]:
+        """The level in each skill at the end of each day, by undoing later level changes."""
+        zone = child_zone(child, self.settings)
+        level: dict[SkillCategory, int] = dict.fromkeys(SkillCategory, MIN_LEVEL)
+        level.update(
+            self.db.execute(
+                select(SkillLevel.category, SkillLevel.level).where(SkillLevel.child_id == child.id)
+            ).all()
+        )
+        changes = self.db.scalars(
+            select(LevelHistory)
+            .where(
+                LevelHistory.child_id == child.id,
+                LevelHistory.created_at >= start_of_day(start, zone),
+            )
+            .order_by(LevelHistory.created_at.desc())
+        ).all()
+
+        by_day = {}
+        pending = iter(changes)
+        change = next(pending, None)
+        day = last
+        # Changes after the period still need undoing, so this starts from today's levels.
+        while day >= start:
+            while change is not None and local_date(change.created_at, zone) > day:
+                level[change.category] = change.old_level
+                change = next(pending, None)
+            by_day[day] = [DayLevelOut(category=c, level=level[c]) for c in SkillCategory]
+            day -= timedelta(days=1)
+        return by_day
 
     def _play_dates(self, child: Child) -> list[date]:
         return list(
@@ -481,6 +539,21 @@ class ProgressService:
                 child_id=child.id,
             )
             self.db.commit()
+
+
+def _games_on_day(played: list[tuple[GameSession, Game]]) -> list[GameDayOut]:
+    by_game: dict[str, tuple[Game, list[float]]] = {}
+    for session, game in played:
+        by_game.setdefault(game.slug, (game, []))[1].append(session.accuracy or 0.0)
+    return [
+        GameDayOut(
+            game=game.slug,
+            category=game.category,
+            sessions=len(scores),
+            average_accuracy=round(statistics.fmean(scores), 1),
+        )
+        for game, scores in sorted(by_game.values(), key=lambda item: item[0].sort_order)
+    ]
 
 
 def _mean(values: list[float] | None) -> float | None:

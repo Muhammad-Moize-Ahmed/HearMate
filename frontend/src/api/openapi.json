@@ -881,6 +881,23 @@
         "title": "CorrectAnswerOut",
         "type": "object"
       },
+      "DayLevelOut": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/SkillCategory"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "level"
+        ],
+        "title": "DayLevelOut",
+        "type": "object"
+      },
       "DayOut": {
         "properties": {
           "average_accuracy": {
@@ -898,6 +915,22 @@
             "format": "date",
             "title": "Date",
             "type": "string"
+          },
+          "games": {
+            "description": "Completed sessions that day, per game",
+            "items": {
+              "$ref": "#/components/schemas/GameDayOut"
+            },
+            "title": "Games",
+            "type": "array"
+          },
+          "levels": {
+            "description": "The level in each skill at the end of the day",
+            "items": {
+              "$ref": "#/components/schemas/DayLevelOut"
+            },
+            "title": "Levels",
+            "type": "array"
           },
           "minutes": {
             "title": "Minutes",
@@ -917,7 +950,9 @@
           "sessions",
           "points",
           "minutes",
-          "average_accuracy"
+          "average_accuracy",
+          "games",
+          "levels"
         ],
         "title": "DayOut",
         "type": "object"
@@ -1089,6 +1124,33 @@
         ],
         "title": "FocusArea",
         "type": "string"
+      },
+      "GameDayOut": {
+        "properties": {
+          "average_accuracy": {
+            "title": "Average Accuracy",
+            "type": "number"
+          },
+          "category": {
+            "$ref": "#/components/schemas/SkillCategory"
+          },
+          "game": {
+            "title": "Game",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "game",
+          "category",
+          "sessions",
+          "average_accuracy"
+        ],
+        "title": "GameDayOut",
+        "type": "object"
       },
       "GameOut": {
         "properties": {
@@ -5602,6 +5664,25 @@
               "title": "Days",
               "type": "integer"
             }
+          },
+          {
+            "description": "Last day of the period (the child's today when left out or later)",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day of the period (the child's today when left out or later)",
+              "title": "End"
+            }
           }
         ],
         "responses": {
@@ -5664,6 +5745,25 @@
               "minimum": 7,
               "title": "Days",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Last day of the period (the child's today when left out or later)",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day of the period (the child's today when left out or later)",
+              "title": "End"
             }
           }
         ],
@@ -5731,6 +5831,25 @@
               "minimum": 7,
               "title": "Days",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Last day of the period (the child's today when left out or later)",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day of the period (the child's today when left out or later)",
+              "title": "End"
             }
           }
         ],

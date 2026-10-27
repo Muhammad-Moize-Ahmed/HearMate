@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -19,6 +20,10 @@ progress_router = APIRouter(prefix="/children/{child_id}", tags=["progress"])
 family_router = APIRouter(prefix="/family", tags=["progress"])
 
 Days = Annotated[int, Query(ge=7, le=365, description="Length of the period, in the child's days")]
+End = Annotated[
+    date | None,
+    Query(description="Last day of the period (the child's today when left out or later)"),
+]
 
 
 def get_service(
@@ -31,22 +36,28 @@ Service = Annotated[ProgressService, Depends(get_service)]
 
 
 @progress_router.get("/progress")
-def get_progress(child_id: uuid.UUID, service: Service, days: Days = 30) -> ProgressSummaryOut:
+def get_progress(
+    child_id: uuid.UUID, service: Service, days: Days = 30, end: End = None
+) -> ProgressSummaryOut:
     """Totals, streaks, levels and accuracy per skill, recent level changes and active goals."""
-    return service.summary(child_id, days)
+    return service.summary(child_id, days, end)
 
 
 @progress_router.get("/progress/trend")
-def get_progress_trend(child_id: uuid.UUID, service: Service, days: Days = 30) -> list[DayOut]:
+def get_progress_trend(
+    child_id: uuid.UUID, service: Service, days: Days = 30, end: End = None
+) -> list[DayOut]:
     """One point per day for charts (days without play are zeros)."""
-    return service.trend(child_id, days)
+    return service.trend(child_id, days, end)
 
 
 @progress_router.get("/report")
-def get_report(child_id: uuid.UUID, service: Service, days: Days = 30) -> ChildReportOut:
+def get_report(
+    child_id: uuid.UUID, service: Service, days: Days = 30, end: End = None
+) -> ChildReportOut:
     """Detailed report for parents and linked therapists: per game, accuracy by noise level,
     speech sounds to practise and the hardest sound contrasts."""
-    return service.report(child_id, days)
+    return service.report(child_id, days, end)
 
 
 @progress_router.get("/achievements")

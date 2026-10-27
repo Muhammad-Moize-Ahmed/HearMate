@@ -71,3 +71,16 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Printing (or "Save as PDF") a report: white paper, sensible margins, and chart colours kept. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: white;
+  }
+  svg {
+    print-color-adjust: exact;
+  }
+}

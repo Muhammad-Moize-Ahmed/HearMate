@@ -22,7 +22,7 @@ export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-10 border-b-2 border-brand-100 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-10 print:hidden border-b-2 border-brand-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <Link to={home} className="rounded-2xl" aria-label="Home">
@@ -47,7 +47,7 @@ export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10 print:max-w-none print:p-0">
         <Outlet />
       </main>
     </div>

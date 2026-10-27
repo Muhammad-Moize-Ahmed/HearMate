@@ -1,21 +1,25 @@
+import type { ComponentType } from 'react';
 import type { RouteObject } from 'react-router';
 
 import { PublicOnly, RequireRole } from '../auth/guards';
-import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
-import { LoginPage } from '../features/auth/LoginPage';
-import { SignupPage } from '../features/auth/SignupPage';
-import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
-import { EditChildPage, NewChildPage } from '../features/children/ChildFormPages';
-import { ChildPage } from '../features/children/ChildPage';
-import { ParentDashboard } from '../features/children/ParentDashboard';
-import { AdminHome, TherapistHome } from '../features/home/HomePages';
+import { FullPageSpinner } from '../components/ui/Spinner';
 import { LandingPage } from '../features/landing/LandingPage';
 import { NotFoundPage } from '../features/landing/NotFoundPage';
-import { ChildHome } from '../features/play/ChildHome';
-import { GamePlayerPage } from '../features/play/GamePlayerPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ChildLayout } from './layouts/ChildLayout';
 import { RoleLayout } from './layouts/RoleLayout';
+
+/**
+ * A page loaded on first visit, in its own chunk: the first download carries only the shell
+ * (router, auth, layouts, landing page) and each area fetches its own code (and libraries, such
+ * as the chart library) when it is opened.
+ */
+function page<M>(load: () => Promise<M>, pick: (module: M) => ComponentType) {
+  return async () => ({ Component: pick(await load()) });
+}
+
+/** Shown while the first page's code loads, before anything else is on screen. */
+const hydrateFallbackElement = <FullPageSpinner />;
 
 /**
  * Every screen. Each role's area sits behind `RequireRole`; the sign-in screens sit behind
@@ -24,15 +28,40 @@ import { RoleLayout } from './layouts/RoleLayout';
 export const routes: RouteObject[] = [
   {
     element: <AuthLayout />,
+    hydrateFallbackElement,
     children: [
       { index: true, element: <LandingPage /> },
       {
         element: <PublicOnly />,
         children: [
-          { path: 'login', element: <LoginPage /> },
-          { path: 'signup', element: <SignupPage /> },
-          { path: 'verify-email', element: <VerifyEmailPage /> },
-          { path: 'forgot-password', element: <ForgotPasswordPage /> },
+          {
+            path: 'login',
+            lazy: page(
+              () => import('../features/auth/LoginPage'),
+              (m) => m.LoginPage,
+            ),
+          },
+          {
+            path: 'signup',
+            lazy: page(
+              () => import('../features/auth/SignupPage'),
+              (m) => m.SignupPage,
+            ),
+          },
+          {
+            path: 'verify-email',
+            lazy: page(
+              () => import('../features/auth/VerifyEmailPage'),
+              (m) => m.VerifyEmailPage,
+            ),
+          },
+          {
+            path: 'forgot-password',
+            lazy: page(
+              () => import('../features/auth/ForgotPasswordPage'),
+              (m) => m.ForgotPasswordPage,
+            ),
+          },
         ],
       },
       { path: '*', element: <NotFoundPage /> },
@@ -40,48 +69,125 @@ export const routes: RouteObject[] = [
   },
   {
     element: <RequireRole kinds={['parent']} />,
+    hydrateFallbackElement,
     children: [
       {
         path: 'parent',
         element: <RoleLayout roleLabel="Parent" badgeClass="bg-sun-200" home="/parent" />,
         children: [
-          { index: true, element: <ParentDashboard /> },
-          { path: 'children/new', element: <NewChildPage /> },
-          { path: 'children/:childId', element: <ChildPage /> },
-          { path: 'children/:childId/edit', element: <EditChildPage /> },
+          {
+            index: true,
+            lazy: page(
+              () => import('../features/children/ParentDashboard'),
+              (m) => m.ParentDashboard,
+            ),
+          },
+          {
+            path: 'children/new',
+            lazy: page(
+              () => import('../features/children/ChildFormPages'),
+              (m) => m.NewChildPage,
+            ),
+          },
+          {
+            path: 'children/:childId',
+            lazy: page(
+              () => import('../features/children/ChildPage'),
+              (m) => m.ChildPage,
+            ),
+          },
+          {
+            path: 'children/:childId/edit',
+            lazy: page(
+              () => import('../features/children/ChildFormPages'),
+              (m) => m.EditChildPage,
+            ),
+          },
+          {
+            path: 'children/:childId/progress',
+            lazy: page(
+              () => import('../features/progress/ProgressPage'),
+              (m) => m.ProgressPage,
+            ),
+          },
+          {
+            path: 'children/:childId/report',
+            lazy: page(
+              () => import('../features/progress/ReportPage'),
+              (m) => m.ReportPage,
+            ),
+          },
         ],
       },
     ],
   },
   {
     element: <RequireRole kinds={['therapist']} />,
+    hydrateFallbackElement,
     children: [
       {
         path: 'therapist',
         element: <RoleLayout roleLabel="Therapist" badgeClass="bg-mint-200" home="/therapist" />,
-        children: [{ index: true, element: <TherapistHome /> }],
+        children: [
+          {
+            index: true,
+            lazy: page(
+              () => import('../features/home/HomePages'),
+              (m) => m.TherapistHome,
+            ),
+          },
+        ],
       },
     ],
   },
   {
     element: <RequireRole kinds={['admin']} />,
+    hydrateFallbackElement,
     children: [
       {
         path: 'admin',
         element: <RoleLayout roleLabel="Admin" badgeClass="bg-slate-200" home="/admin" />,
-        children: [{ index: true, element: <AdminHome /> }],
+        children: [
+          {
+            index: true,
+            lazy: page(
+              () => import('../features/home/HomePages'),
+              (m) => m.AdminHome,
+            ),
+          },
+        ],
       },
     ],
   },
   {
     element: <RequireRole kinds={['child']} />,
+    hydrateFallbackElement,
     children: [
       {
         path: 'play',
         element: <ChildLayout />,
         children: [
-          { index: true, element: <ChildHome /> },
-          { path: 'games/:slug', element: <GamePlayerPage /> },
+          {
+            index: true,
+            lazy: page(
+              () => import('../features/play/ChildHome'),
+              (m) => m.ChildHome,
+            ),
+          },
+          {
+            path: 'games/:slug',
+            lazy: page(
+              () => import('../features/play/GamePlayerPage'),
+              (m) => m.GamePlayerPage,
+            ),
+          },
+          {
+            path: 'progress',
+            lazy: page(
+              () => import('../features/progress/MyProgressPage'),
+              (m) => m.MyProgressPage,
+            ),
+          },
         ],
       },
     ],

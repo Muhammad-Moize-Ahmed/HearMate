@@ -25,6 +25,12 @@ export function ChildHome() {
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-4xl font-black sm:text-5xl">Hi {name}!</h1>
         <p className="text-2xl">Pick a game to play.</p>
+        <Link
+          to="/play/progress"
+          className="inline-flex min-h-12 items-center gap-2 rounded-full bg-sun-300 px-5 text-xl font-black shadow-[0_4px_0_#ca8a04] active:translate-y-1 active:shadow-none"
+        >
+          <span aria-hidden="true">⭐</span> My progress
+        </Link>
         {week && week.current_streak > 0 && (
           <p className="rounded-full bg-white/80 px-4 py-1.5 text-lg font-black">
             <span aria-hidden="true">🔥 </span>

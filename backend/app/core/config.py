@@ -119,6 +119,12 @@ class Settings(BaseSettings):
             raise ValueError(f"unknown time zone {value!r}") from exc
         return value
 
+    @field_validator("PIPER_VOICE_DIR", "TTS_CACHE_DIR", "SOUNDS_DIR")
+    @classmethod
+    def _expand_home(cls, value: Path | None) -> Path | None:
+        # Lets .env say SOUNDS_DIR=~/.cache/hearmate/sounds (no shell expands "~" there).
+        return value.expanduser() if value is not None else None
+
     @field_validator("LOG_LEVEL")
     @classmethod
     def _upper_log_level(cls, value: str) -> str:
