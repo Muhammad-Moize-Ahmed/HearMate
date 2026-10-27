@@ -186,6 +186,13 @@ export const routes: RouteObject[] = [
               (m) => m.AdminDashboard,
             ),
           },
+          {
+            path: 'users',
+            lazy: page(
+              () => import('../features/admin/AdminUsersPage'),
+              (m) => m.AdminUsersPage,
+            ),
+          },
         ],
       },
     ],

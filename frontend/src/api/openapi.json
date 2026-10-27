@@ -41,6 +41,168 @@
         "title": "AchievementOut",
         "type": "object"
       },
+      "AdminStatsOut": {
+        "description": "Counts only: no names, usernames or other personal details.",
+        "properties": {
+          "admins": {
+            "title": "Admins",
+            "type": "integer"
+          },
+          "children": {
+            "title": "Children",
+            "type": "integer"
+          },
+          "disabled_accounts": {
+            "title": "Disabled Accounts",
+            "type": "integer"
+          },
+          "parents": {
+            "title": "Parents",
+            "type": "integer"
+          },
+          "sessions_completed_last_30_days": {
+            "title": "Sessions Completed Last 30 Days",
+            "type": "integer"
+          },
+          "sessions_completed_last_7_days": {
+            "title": "Sessions Completed Last 7 Days",
+            "type": "integer"
+          },
+          "therapists": {
+            "$ref": "#/components/schemas/TherapistCountsOut"
+          }
+        },
+        "required": [
+          "parents",
+          "therapists",
+          "admins",
+          "disabled_accounts",
+          "children",
+          "sessions_completed_last_7_days",
+          "sessions_completed_last_30_days"
+        ],
+        "title": "AdminStatsOut",
+        "type": "object"
+      },
+      "AdminUserOut": {
+        "description": "An adult account, as an admin sees it. Children never appear here except as a count.",
+        "properties": {
+          "children_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parents only; null for other roles",
+            "title": "Children Count"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "therapist_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TherapistApprovalStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Therapists only; null for other roles"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "role",
+          "status",
+          "email_verified",
+          "therapist_status",
+          "children_count",
+          "created_at",
+          "last_login_at"
+        ],
+        "title": "AdminUserOut",
+        "type": "object"
+      },
+      "AdminUserPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Matching accounts across all pages",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AdminUserPageOut",
+        "type": "object"
+      },
       "AnswerIn": {
         "additionalProperties": false,
         "properties": {
@@ -3193,6 +3355,34 @@
         "title": "TherapistBriefOut",
         "type": "object"
       },
+      "TherapistCountsOut": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "title": "TherapistCountsOut",
+        "type": "object"
+      },
       "TherapistDetailsIn": {
         "additionalProperties": false,
         "properties": {
@@ -3518,6 +3708,18 @@
             "title": "Last Name",
             "type": "string"
           },
+          "therapist_rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why an admin didn't approve this therapist account",
+            "title": "Therapist Rejection Reason"
+          },
           "therapist_status": {
             "anyOf": [
               {
@@ -3538,6 +3740,23 @@
         ],
         "title": "UserMeOut",
         "type": "object"
+      },
+      "UserRole": {
+        "enum": [
+          "parent",
+          "therapist",
+          "admin"
+        ],
+        "title": "UserRole",
+        "type": "string"
+      },
+      "UserStatus": {
+        "enum": [
+          "active",
+          "disabled"
+        ],
+        "title": "UserStatus",
+        "type": "string"
       },
       "ValidationError": {
         "properties": {
@@ -3703,6 +3922,33 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/stats": {
+      "get": {
+        "description": "Account, child and session counts for the dashboard. Counts only.",
+        "operationId": "stats_api_admin_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Stats",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/therapists": {
       "get": {
         "description": "Therapist accounts, oldest first. Filter with e.g. `?status=pending`.",
@@ -3863,6 +4109,123 @@
           }
         ],
         "summary": "Reject Therapist",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "description": "Adult accounts (parents, therapists, admins), newest first. Read-only.\n\nChildren are never listed; a parent's row only says how many children they have.",
+        "operationId": "list_users_api_admin_users_get",
+        "parameters": [
+          {
+            "description": "Part of an email or name",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of an email or name",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserRole"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "description": "Account status",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account status",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Users",
         "tags": [
           "admin"
         ]

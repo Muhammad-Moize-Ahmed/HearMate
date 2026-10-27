@@ -7,7 +7,7 @@ from ...auth.principal import Principal
 from ...auth.rate_limit import RateLimiter
 from ...core.deps import AppSettings, ClientIp, Limiter, Mailer
 from ...core.errors import AuthenticationError
-from ...db.models import Child, TherapistProfile, User
+from ...db.models import Child, TherapistApprovalStatus, TherapistProfile, User
 from ...providers.email import send_safely
 from .schemas import (
     ChildLoginIn,
@@ -109,6 +109,9 @@ def describe_principal(db: DbSession, principal: Principal) -> UserMeOut | Child
         first_name=user.first_name,
         last_name=user.last_name,
         therapist_status=profile.approval_status if profile else None,
+        therapist_rejection_reason=profile.rejection_reason
+        if profile and profile.approval_status is TherapistApprovalStatus.REJECTED
+        else None,
     )
 
 

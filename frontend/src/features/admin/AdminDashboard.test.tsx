@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 
-import { ADMIN, APPROVED_THERAPIST, therapistOut } from '../../test/careFixtures';
+import { ADMIN, APPROVED_THERAPIST, statsOut, therapistOut } from '../../test/careFixtures';
 import { CHILD, errorBody, mockApi, PARENT, THERAPIST, tokenFor } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 
@@ -35,6 +35,7 @@ function mockAdminApi(routes: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'POST /api/auth/refresh': { body: tokenFor(ADMIN) },
     'GET /api/admin/therapists': () => ({ body: accounts }),
+    'GET /api/admin/stats': { body: statsOut() },
     [`POST /api/admin/therapists/${PENDING.id}/approve`]: () =>
       decide(PENDING.id, { approval_status: 'approved' }),
     [`POST /api/admin/therapists/${PENDING.id}/reject`]: ({ body }) =>
@@ -52,6 +53,8 @@ const pendingSection = () =>
   screen.getByRole('heading', { name: 'Waiting for approval' }).closest('section')!;
 const accountList = () =>
   screen.getByRole('heading', { name: 'Therapist accounts' }).closest('section')!;
+/** Wait for the therapist list (the counts load separately). */
+const loaded = () => screen.findByRole('heading', { name: 'Therapist accounts' });
 
 describe('Admin dashboard', () => {
   it('shows counts and the therapists waiting for approval', async () => {
@@ -59,10 +62,16 @@ describe('Admin dashboard', () => {
     renderApp('/admin');
 
     expect(await screen.findByText('Therapists', { selector: 'dt' })).toBeInTheDocument();
+    expect(countOf('Parents')).toBe('12');
+    expect(countOf('Children')).toBe('17');
     expect(countOf('Therapists')).toBe('3');
+    expect(screen.getByText('1 approved · 1 not approved')).toBeInTheDocument();
     expect(countOf('Waiting for approval')).toBe('1');
-    expect(countOf('Approved')).toBe('1');
-    expect(countOf('Not approved')).toBe('1');
+    expect(countOf('Games, last 7 days')).toBe('40');
+    expect(countOf('Games, last 30 days')).toBe('150');
+    expect(countOf('Turned-off accounts')).toBe('2');
+
+    await loaded();
 
     const pending = pendingSection();
     expect(within(pending).getByText('Sara Khan')).toBeInTheDocument();
@@ -74,7 +83,7 @@ describe('Admin dashboard', () => {
     const api = mockAdminApi();
     const { user } = renderApp('/admin');
 
-    await screen.findByText('Therapists', { selector: 'dt' });
+    await loaded();
     await user.click(within(pendingSection()).getByRole('button', { name: 'Approve Sara Khan' }));
 
     expect(api.callsTo(`POST /api/admin/therapists/${PENDING.id}/approve`)).toHaveLength(1);
@@ -85,7 +94,7 @@ describe('Admin dashboard', () => {
     const api = mockAdminApi();
     const { user } = renderApp('/admin');
 
-    await screen.findByText('Therapists', { selector: 'dt' });
+    await loaded();
     await user.click(within(pendingSection()).getByRole('button', { name: 'Reject Sara Khan' }));
     let dialog = screen.getByRole('alertdialog', { name: 'Reject Sara Khan?' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -110,7 +119,7 @@ describe('Admin dashboard', () => {
     mockAdminApi();
     const { user, router } = renderApp('/admin');
 
-    await screen.findByText('Therapists', { selector: 'dt' });
+    await loaded();
     const list = accountList();
     expect(within(list).getByText('3 accounts')).toBeInTheDocument();
 
@@ -134,7 +143,7 @@ describe('Admin dashboard', () => {
     mockAdminApi();
     renderApp('/admin?status=approved');
 
-    await screen.findByText('Therapists', { selector: 'dt' });
+    await loaded();
     expect(within(accountList()).getByText('1 account')).toBeInTheDocument();
     expect(within(accountList()).getByText('Omar Raza')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Approved' })).toBeChecked();
@@ -149,33 +158,57 @@ describe('Admin dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Admins only');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
+
+  it('still works when the counts cannot load', async () => {
+    mockAdminApi({
+      'GET /api/admin/stats': { status: 403, body: errorBody('forbidden', 'No counts') },
+    });
+    renderApp('/admin');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't load the counts");
+    expect(await loaded()).toBeInTheDocument();
+    expect(within(pendingSection()).getByText('Sara Khan')).toBeInTheDocument();
+  });
 });
 
-describe('Admin routes', () => {
-  it.each([
-    ['a parent', PARENT, '/parent', /Hi, Sam!/],
-    ['an approved therapist', APPROVED_THERAPIST, '/therapist', /Hi, Sara!/],
-    ['a therapist waiting for approval', THERAPIST, '/therapist', /Hi, Sara!/],
-    ['a child', CHILD, '/play', /Hi Ali!/],
-  ])('keep %s out and never call the admin API', async (_, principal, home, greeting) => {
-    const api = mockApi({
-      'POST /api/auth/refresh': { body: tokenFor(principal) },
-      // Whatever the home page asks for; the admin API is deliberately not mocked.
-      'GET /api/children': { body: [] },
-      'GET /api/family/progress': { body: [] },
-      'GET /api/therapist/links': { body: [] },
-      'GET /api/games': { body: [] },
-      [`GET /api/children/${CHILD.id}/levels`]: { body: [] },
-      'GET /api/speech/status': {
-        body: { stt: { provider: 'none', available: false }, tts: { voice: '', available: false } },
-      },
-    });
-    const { router } = renderApp('/admin?status=pending');
+const NON_ADMINS = [
+  ['a parent', PARENT, '/parent', /Hi, Sam!/],
+  ['an approved therapist', APPROVED_THERAPIST, '/therapist', /Hi, Sara!/],
+  ['a therapist waiting for approval', THERAPIST, '/therapist', /Hi, Sara!/],
+  ['a child', CHILD, '/play', /Hi Ali!/],
+] as const;
+const ADMIN_PATHS = ['/admin?status=pending', '/admin/users?role=parent'];
 
-    expect(await screen.findByRole('heading', { name: greeting })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(home);
-    expect(api.calls.filter((c) => c.path.startsWith('/api/admin'))).toEqual([]);
-  });
+describe('Admin routes', () => {
+  it.each(
+    NON_ADMINS.flatMap(([who, principal, home, greeting]) =>
+      ADMIN_PATHS.map((path) => [who, path, principal, home, greeting] as const),
+    ),
+  )(
+    'keep %s out of %s and never call the admin API',
+    async (_, path, principal, home, greeting) => {
+      const api = mockApi({
+        'POST /api/auth/refresh': { body: tokenFor(principal) },
+        // Whatever the home page asks for; the admin API is deliberately not mocked.
+        'GET /api/children': { body: [] },
+        'GET /api/family/progress': { body: [] },
+        'GET /api/therapist/links': { body: [] },
+        'GET /api/games': { body: [] },
+        [`GET /api/children/${CHILD.id}/levels`]: { body: [] },
+        'GET /api/speech/status': {
+          body: {
+            stt: { provider: 'none', available: false },
+            tts: { voice: '', available: false },
+          },
+        },
+      });
+      const { router } = renderApp(path);
+
+      expect(await screen.findByRole('heading', { name: greeting })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(home);
+      expect(api.calls.filter((c) => c.path.startsWith('/api/admin'))).toEqual([]);
+    },
+  );
 
   it('sends a signed-out visitor to sign in', async () => {
     const api = mockApi({});

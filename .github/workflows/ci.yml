@@ -15,7 +15,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (lint, types, tests)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Normally ~2 min. A cap stops a stuck run from holding a runner for GitHub's 6-hour default.
     timeout-minutes: 15
     defaults:
@@ -49,14 +49,26 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           enable-cache: true
-      # Run #8 spent 20 min here on a crawling apt mirror. Skip if the image already has ffmpeg,
-      # retry flaky downloads, and give up after 5 min (re-run the job) instead of waiting.
+      # 26 tests (test_speech_audio.py, db/test_speech_rounds.py) decode audio with real ffmpeg and
+      # are silently skipped without it. Slow apt mirrors have stalled this step before, so: skip if
+      # the image already has ffmpeg; try the runner's existing package lists first (no full
+      # `apt-get update`); drop a stalled connection after 30 s and retry; at most 3 attempts.
       - name: Install ffmpeg (audio decoding for speech tests)
-        timeout-minutes: 5
+        timeout-minutes: 6
         run: |
           if command -v ffmpeg >/dev/null; then ffmpeg -version | head -n 1; exit 0; fi
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg
+          apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          install_ffmpeg() { sudo apt-get "${apt_opts[@]}" install -y --no-install-recommends ffmpeg; }
+          for attempt in 1 2 3; do
+            # Stale lists can point at removed package versions; refresh them only then.
+            if install_ffmpeg || { sudo apt-get "${apt_opts[@]}" update && install_ffmpeg; }; then
+              ffmpeg -version | head -n 1
+              exit 0
+            fi
+            echo "ffmpeg install attempt $attempt failed; retrying in $((attempt * 10)) s"
+            sleep $((attempt * 10))
+          done
+          exit 1
       - run: uv sync --locked
         timeout-minutes: 5
       - run: uv run ruff check .
@@ -69,7 +81,7 @@ jobs:
 
   frontend:
     name: Frontend (lint, types, tests, build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Normally under 1 min.
     timeout-minutes: 10
     defaults:
@@ -97,7 +109,7 @@ jobs:
 
   secrets:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Normally ~10 s.
     timeout-minutes: 5
     steps:

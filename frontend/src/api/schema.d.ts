@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats
+         * @description Account, child and session counts for the dashboard. Counts only.
+         */
+        get: operations["stats_api_admin_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/therapists": {
         parameters: {
             query?: never;
@@ -52,6 +72,28 @@ export interface paths {
         put?: never;
         /** Reject Therapist */
         post: operations["reject_therapist_api_admin_therapists__therapist_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description Adult accounts (parents, therapists, admins), newest first. Read-only.
+         *
+         *     Children are never listed; a parent's row only says how many children they have.
+         */
+        get: operations["list_users_api_admin_users_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -995,6 +1037,74 @@ export interface components {
             title: string;
             /** Unlocked At */
             unlocked_at?: string | null;
+        };
+        /**
+         * AdminStatsOut
+         * @description Counts only: no names, usernames or other personal details.
+         */
+        AdminStatsOut: {
+            /** Admins */
+            admins: number;
+            /** Children */
+            children: number;
+            /** Disabled Accounts */
+            disabled_accounts: number;
+            /** Parents */
+            parents: number;
+            /** Sessions Completed Last 30 Days */
+            sessions_completed_last_30_days: number;
+            /** Sessions Completed Last 7 Days */
+            sessions_completed_last_7_days: number;
+            therapists: components["schemas"]["TherapistCountsOut"];
+        };
+        /**
+         * AdminUserOut
+         * @description An adult account, as an admin sees it. Children never appear here except as a count.
+         */
+        AdminUserOut: {
+            /**
+             * Children Count
+             * @description Parents only; null for other roles
+             */
+            children_count: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Email Verified */
+            email_verified: boolean;
+            /** First Name */
+            first_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Last Name */
+            last_name: string;
+            role: components["schemas"]["UserRole"];
+            status: components["schemas"]["UserStatus"];
+            /** @description Therapists only; null for other roles */
+            therapist_status: components["schemas"]["TherapistApprovalStatus"] | null;
+        };
+        /** AdminUserPageOut */
+        AdminUserPageOut: {
+            /** Items */
+            items: components["schemas"]["AdminUserOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /**
+             * Total
+             * @description Matching accounts across all pages
+             */
+            total: number;
         };
         /** AnswerIn */
         AnswerIn: {
@@ -2099,6 +2209,17 @@ export interface components {
             /** Specialization */
             specialization: string | null;
         };
+        /** TherapistCountsOut */
+        TherapistCountsOut: {
+            /** Approved */
+            approved: number;
+            /** Pending */
+            pending: number;
+            /** Rejected */
+            rejected: number;
+            /** Total */
+            total: number;
+        };
         /** TherapistDetailsIn */
         TherapistDetailsIn: {
             /** License Number */
@@ -2218,8 +2339,23 @@ export interface components {
             kind: "admin" | "parent" | "therapist";
             /** Last Name */
             last_name: string;
+            /**
+             * Therapist Rejection Reason
+             * @description Why an admin didn't approve this therapist account
+             */
+            therapist_rejection_reason?: string | null;
             therapist_status?: components["schemas"]["TherapistApprovalStatus"] | null;
         };
+        /**
+         * UserRole
+         * @enum {string}
+         */
+        UserRole: "parent" | "therapist" | "admin";
+        /**
+         * UserStatus
+         * @enum {string}
+         */
+        UserStatus: "active" | "disabled";
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2279,6 +2415,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    stats_api_admin_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStatsOut"];
+                };
+            };
+        };
+    };
     list_therapists_api_admin_therapists_get: {
         parameters: {
             query?: {
@@ -2363,6 +2519,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TherapistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_admin_users_get: {
+        parameters: {
+            query?: {
+                /** @description Part of an email or name */
+                q?: string | null;
+                role?: components["schemas"]["UserRole"] | null;
+                /** @description Account status */
+                status?: components["schemas"]["UserStatus"] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserPageOut"];
                 };
             };
             /** @description Validation Error */

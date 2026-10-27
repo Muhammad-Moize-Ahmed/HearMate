@@ -4,16 +4,18 @@ import { useSearchParams } from 'react-router';
 import { describeError } from '../../api/client';
 import { usePrincipal } from '../../auth/context';
 import { Alert } from '../../components/ui/Alert';
-import { Button } from '../../components/ui/Button';
+import { Button, LinkButton } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { SegmentedChoice, TextAreaField } from '../../components/ui/fields';
 import { TextField } from '../../components/ui/TextField';
 import { Loading } from '../children/common';
 import {
+  useAdminStats,
   useApproveTherapist,
   useRejectTherapist,
   useTherapists,
   type ApprovalStatus,
+  type Stats,
   type Therapist,
 } from './queries';
 
@@ -53,8 +55,8 @@ function matches(therapist: Therapist, query: string): boolean {
 }
 
 /**
- * Administration: therapist approvals and the therapist account list. Admins manage accounts
- * only; they have no access to children's data, so nothing here asks for it.
+ * Administration: counts, therapist approvals and the therapist account list. Admins manage
+ * accounts only; they have no access to children's data (children appear only as counts).
  */
 export function AdminDashboard() {
   const principal = usePrincipal();
@@ -64,9 +66,18 @@ export function AdminDashboard() {
   return (
     <>
       <title>Administration · HearMate</title>
-      <div className="mb-8 flex flex-col gap-2">
-        <h1 className="text-3xl font-black sm:text-4xl">Hi, {name}!</h1>
-        <p className="text-lg text-ink-soft">HearMate administration.</p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-black sm:text-4xl">Hi, {name}!</h1>
+          <p className="text-lg text-ink-soft">HearMate administration.</p>
+        </div>
+        <LinkButton to="/admin/users" variant="secondary">
+          <span aria-hidden="true">👥</span> All accounts
+        </LinkButton>
+      </div>
+
+      <div className="mb-8">
+        <StatsPanel />
       </div>
 
       {therapists.isPending && <Loading label="Loading therapist accounts…" />}
@@ -83,20 +94,48 @@ export function AdminDashboard() {
   );
 }
 
+/** Counts from the server: accounts, children and recent games. Never names or details. */
+function StatsPanel() {
+  const stats = useAdminStats();
+  if (stats.isPending) return <Loading label="Loading counts…" />;
+  if (stats.isError) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <Alert tone="error">We couldn't load the counts. {describeError(stats.error)}</Alert>
+        <Button variant="secondary" onClick={() => void stats.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  return <Counts stats={stats.data} />;
+}
+
+function Counts({ stats }: { stats: Stats }) {
+  const { therapists } = stats;
+  return (
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <Count label="Parents" value={stats.parents} />
+      <Count label="Children" value={stats.children} />
+      <Count
+        label="Therapists"
+        value={therapists.total}
+        note={`${therapists.approved} approved · ${therapists.rejected} not approved`}
+      />
+      <Count label="Waiting for approval" value={therapists.pending} />
+      <Count label="Games, last 7 days" value={stats.sessions_completed_last_7_days} />
+      <Count label="Games, last 30 days" value={stats.sessions_completed_last_30_days} />
+      <Count label="Admins" value={stats.admins} />
+      <Count label="Turned-off accounts" value={stats.disabled_accounts} />
+    </dl>
+  );
+}
+
 function Overview({ therapists }: { therapists: Therapist[] }) {
-  const count = (status: ApprovalStatus) =>
-    therapists.filter((t) => t.approval_status === status).length;
   const pending = therapists.filter((t) => t.approval_status === 'pending');
 
   return (
     <div className="flex flex-col gap-8">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Count label="Therapists" value={therapists.length} />
-        <Count label="Waiting for approval" value={count('pending')} />
-        <Count label="Approved" value={count('approved')} />
-        <Count label="Not approved" value={count('rejected')} />
-      </dl>
-
       <section className="flex flex-col gap-3">
         <h2 className="text-2xl font-black">Waiting for approval</h2>
         {pending.length === 0 ? (
@@ -119,9 +158,10 @@ function Overview({ therapists }: { therapists: Therapist[] }) {
   );
 }
 
-function Count({ label, value }: { label: string; value: number }) {
+function Count({ label, value, note }: { label: string; value: number; note?: string }) {
   return (
     <div className="flex flex-col-reverse gap-1 rounded-3xl bg-white p-4 ring-2 ring-brand-100">
+      {note && <dd className="text-xs text-ink-soft">{note}</dd>}
       <dt className="text-sm text-ink-soft">{label}</dt>
       <dd className="text-3xl font-black tabular-nums">{value}</dd>
     </div>

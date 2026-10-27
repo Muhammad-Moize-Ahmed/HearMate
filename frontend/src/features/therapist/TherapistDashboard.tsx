@@ -38,13 +38,16 @@ export function TherapistDashboard() {
       {approved ? (
         <Caseload />
       ) : (
-        <AwaitingApproval rejected={principal.therapist_status === 'rejected'} />
+        <AwaitingApproval
+          rejected={principal.therapist_status === 'rejected'}
+          reason={principal.therapist_rejection_reason ?? null}
+        />
       )}
     </>
   );
 }
 
-function AwaitingApproval({ rejected }: { rejected: boolean }) {
+function AwaitingApproval({ rejected, reason }: { rejected: boolean; reason: string | null }) {
   const [checking, setChecking] = useState(false);
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -67,8 +70,16 @@ function AwaitingApproval({ rejected }: { rejected: boolean }) {
     <div className="flex flex-col items-start gap-4">
       {rejected ? (
         <Alert tone="error">
-          <strong>Your account wasn't approved.</strong> We've emailed you the reason. Please
-          contact support if you think this is a mistake.
+          <strong>Your account wasn't approved.</strong>{' '}
+          {reason ? (
+            <>
+              The reason given: <q className="whitespace-pre-line">{reason}</q>
+            </>
+          ) : (
+            "We've emailed you the reason."
+          )}{' '}
+          If you've sorted this out with HearMate, check again; otherwise please contact support.
+          Until it's approved you can't see any child's information.
         </Alert>
       ) : (
         <Alert tone="info">
@@ -77,12 +88,14 @@ function AwaitingApproval({ rejected }: { rejected: boolean }) {
           parents. We'll email you when it's done.
         </Alert>
       )}
-      {!rejected && (
-        <Button variant="secondary" loading={checking} onClick={() => void checkAgain()}>
-          Check again
-        </Button>
+      <Button variant="secondary" loading={checking} onClick={() => void checkAgain()}>
+        Check again
+      </Button>
+      {checked && !checking && (
+        <p className="text-ink-soft" role="status">
+          {rejected ? 'Still not approved.' : 'Still waiting.'} Try again later.
+        </p>
       )}
-      {checked && !checking && <p className="text-ink-soft">Still waiting. Try again later.</p>}
       {error !== null && <Alert tone="error">{describeError(error)}</Alert>}
     </div>
   );

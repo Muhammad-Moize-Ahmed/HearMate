@@ -41,6 +41,7 @@ def test_login_returns_an_access_token_and_a_locked_down_refresh_cookie(
         "first_name": "Test",
         "last_name": "User",
         "therapist_status": None,
+        "therapist_rejection_reason": None,
     }
     assert response.headers["cache-control"] == "no-store"
     cookie = response.headers["set-cookie"]

@@ -83,6 +83,9 @@ class UserMeOut(BaseModel):
     first_name: str
     last_name: str
     therapist_status: TherapistApprovalStatus | None = None
+    therapist_rejection_reason: str | None = Field(
+        default=None, description="Why an admin didn't approve this therapist account"
+    )
 
 
 class ChildMeOut(BaseModel):

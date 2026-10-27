@@ -129,7 +129,8 @@ src/
 | `/play/progress` | children | "My progress": stars, best games, this week, badges, brothers and sisters this week |
 | `/therapist` | therapists | waiting-for-approval state; once approved: invitations (accept / decline) and linked children |
 | `/therapist/children/:id` (`/progress`, `/report`) | approved therapists with an **active** link to that child | learning plan, notes, profile; the same progress and report pages as parents; leave the care team |
-| `/admin` (`?q=&status=`) | admins | counts, therapists waiting for approval (approve / reject with a reason), therapist accounts with search and status filter |
+| `/admin` (`?q=&status=`) | admins | counts (accounts, children, recent games), therapists waiting for approval (approve / reject with a reason), therapist accounts with search and status filter |
+| `/admin/users` (`?q=&role=&status=&page=`) | admins | every adult account, read-only: search by email or name, filter by role and account status, 25 per page |
 
 - **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
   httpOnly cookie restores the sign-in. Because the backend ends the whole sign-in if a refresh token is used twice,
@@ -156,14 +157,16 @@ src/
   cancel an invitation or remove access (with a confirmation). The same page shows the child's learning plans and
   therapist notes, read-only.
 - **Therapists:** until an admin approves the account, the dashboard shows only that state (with "Check again",
-  which fetches a fresh token) and requests no invitations or children. Every `/therapist/children/:id/...` page
+  which fetches a fresh token) and requests no invitations or children. A rejected therapist sees the admin's
+  reason and can check again too. Every `/therapist/children/:id/...` page
   sits behind `LinkedChildGate`: the page renders, and child data is requested, only if the therapist's own
   links include an **active** link to that child. Otherwise it says there's no access and sends nothing about
   the child (the backend answers 404 anyway). Therapists write notes and edit or delete only their own; they
   start, edit (only changed fields are sent) and archive plans. Archived plans stay readable as history.
-- **Admin:** uses only the existing admin API (list, approve, reject therapists); counts, search and filters are
-  worked out in the browser from the therapist list. Rejecting or withdrawing approval needs a reason, which the
-  backend emails to the therapist. Admins never request children's data.
+- **Admin:** counts come from `/api/admin/stats`; "All accounts" pages through `/api/admin/users` (the search
+  waits until typing stops). Therapist approvals use the therapist list, searched and filtered in the browser.
+  Rejecting or withdrawing approval needs a reason, which the backend emails to the therapist. Admin screens are
+  read-only apart from approvals, and never request children's data: children appear only as counts.
 - **Progress and reports:**
   - **Period:** Week, Month, 3 months or a custom range (7 days to a year, ending by today). It's kept in the URL, so
     a report can be reloaded or bookmarked as it is.

@@ -50,7 +50,7 @@ app/
   modules/
     health/          GET /api/health (liveness), GET /api/health/ready (database check)
     auth/            /api/auth/*: signup, verify-email, login, child-login, refresh, logout, password reset, me
-    admin/           /api/admin/therapists: list, approve, reject
+    admin/           /api/admin/therapists: list, approve, reject; /api/admin/users and /stats (read-only)
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
     care_team/       parent invites a therapist (/api/children/{id}/therapists); therapist accepts (/api/therapist/links)
@@ -95,6 +95,19 @@ tests/               unit tests; tests/db/ needs PostgreSQL
   nothing. Admins have no access to children's therapy data.
 - **Abuse protection:** lockout after 5 wrong passwords/PINs (15 min), per-IP and per-account rate limits,
   signup and password-reset responses that never reveal whether an email is registered, and codes stored only as HMACs.
+- **Admin API:** admins only (others get 401/403), with one shared budget of 120 requests a minute per admin
+  account across every `/api/admin` route. Read-only views:
+  - `GET /admin/users?q=&role=&status=&limit=25&offset=0`: parents, therapists and admins, newest first, with
+    `total` for paging. `q` matches part of an email or name (case-insensitive; `%` and `_` match literally).
+    Each row has the account status, whether the email is verified, the therapist's approval status, and for
+    parents only a `children_count`.
+  - `GET /admin/stats`: counts of parents, therapists by approval status, admins, turned-off accounts, children,
+    and games completed in the last 7 and 30 days.
+
+  Children are never listed: no names, usernames, PINs or profile details, only counts. Nothing here edits,
+  deletes, impersonates or changes roles.
+- **Rejected therapists** see the admin's reason in `/auth/me` (`therapist_rejection_reason`); it is cleared
+  when they are approved.
 - **Rate limiter:** in memory, so it is per process. Run a single API process, or swap in a shared store
   (e.g. Redis) behind `RateLimiter.hit` before scaling out.
 - **Email in development:** `EMAIL_BACKEND=console` prints emails, including codes, to the backend log.

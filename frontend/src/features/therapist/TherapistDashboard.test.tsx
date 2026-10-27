@@ -48,16 +48,31 @@ describe('Therapist dashboard: waiting for approval', () => {
     expect(api.callsTo('GET /api/therapist/links')).toHaveLength(1);
   });
 
-  it('explains a rejected account', async () => {
-    mockApi({
-      'POST /api/auth/refresh': {
-        body: tokenFor({ ...THERAPIST, therapist_status: 'rejected' }),
+  it('shows why a rejected account was not approved, and checks again', async () => {
+    const rejected = {
+      ...THERAPIST,
+      therapist_status: 'rejected',
+      therapist_rejection_reason: 'Licence number not found.',
+    };
+    let refreshes = 0;
+    const api = mockTherapistApi({
+      'POST /api/auth/refresh': () => {
+        refreshes += 1;
+        return { body: tokenFor(refreshes <= 2 ? rejected : APPROVED_THERAPIST) };
       },
     });
-    renderApp('/therapist');
+    const { user } = renderApp('/therapist');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Your account wasn't approved");
-    expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("Your account wasn't approved");
+    expect(alert).toHaveTextContent('Licence number not found.');
+    expect(api.callsTo('GET /api/therapist/links')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(await screen.findByText(/Still not approved/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(await screen.findByRole('heading', { name: 'Patients' })).toBeInTheDocument();
   });
 });
 

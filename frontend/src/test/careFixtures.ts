@@ -127,3 +127,33 @@ export function mockTherapistApi(routes: Routes = {}, links = [linkOut()]) {
     ...routes,
   });
 }
+
+export function statsOut(overrides: Partial<S['AdminStatsOut']> = {}): S['AdminStatsOut'] {
+  return {
+    parents: 12,
+    therapists: { total: 3, pending: 1, approved: 1, rejected: 1 },
+    admins: 1,
+    disabled_accounts: 2,
+    children: 17,
+    sessions_completed_last_7_days: 40,
+    sessions_completed_last_30_days: 150,
+    ...overrides,
+  };
+}
+
+export function adminUserOut(overrides: Partial<S['AdminUserOut']> = {}): S['AdminUserOut'] {
+  return {
+    id: PARENT.id,
+    email: 'sam@example.com',
+    first_name: 'Sam',
+    last_name: 'Parent',
+    role: 'parent',
+    status: 'active',
+    email_verified: true,
+    therapist_status: null,
+    children_count: 2,
+    created_at: '2026-10-01T10:00:00Z',
+    last_login_at: '2026-10-26T10:00:00Z',
+    ...overrides,
+  };
+}
