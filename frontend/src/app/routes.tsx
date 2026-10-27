@@ -8,9 +8,11 @@ import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
 import { EditChildPage, NewChildPage } from '../features/children/ChildFormPages';
 import { ChildPage } from '../features/children/ChildPage';
 import { ParentDashboard } from '../features/children/ParentDashboard';
-import { AdminHome, ChildHome, TherapistHome } from '../features/home/HomePages';
+import { AdminHome, TherapistHome } from '../features/home/HomePages';
 import { LandingPage } from '../features/landing/LandingPage';
 import { NotFoundPage } from '../features/landing/NotFoundPage';
+import { ChildHome } from '../features/play/ChildHome';
+import { GamePlayerPage } from '../features/play/GamePlayerPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ChildLayout } from './layouts/ChildLayout';
 import { RoleLayout } from './layouts/RoleLayout';
@@ -77,7 +79,10 @@ export const routes: RouteObject[] = [
       {
         path: 'play',
         element: <ChildLayout />,
-        children: [{ index: true, element: <ChildHome /> }],
+        children: [
+          { index: true, element: <ChildHome /> },
+          { path: 'games/:slug', element: <GamePlayerPage /> },
+        ],
       },
     ],
   },

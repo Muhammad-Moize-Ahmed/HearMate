@@ -61,36 +61,3 @@ export function AdminHome() {
     </>
   );
 }
-
-export function ChildHome() {
-  const principal = usePrincipal();
-  const name = principal.kind === 'child' ? principal.display_name : '';
-  return (
-    <div className="flex flex-col items-center gap-6 pt-6 text-center">
-      <h1 className="text-4xl font-black sm:text-5xl">Hi {name}!</h1>
-      <p className="text-2xl">Ready to listen and play?</p>
-      <div className="grid w-full max-w-2xl grid-cols-2 gap-4 sm:grid-cols-3">
-        {[
-          { emoji: '🔍', label: 'Sound Detective' },
-          { emoji: '👂', label: 'Same or different?' },
-          { emoji: '🔢', label: 'Word Sequence' },
-          { emoji: '🌧️', label: 'Listen in noise' },
-          { emoji: '🗣️', label: 'Say it!' },
-        ].map((game) => (
-          <div
-            key={game.label}
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-3xl bg-white/90 p-3 opacity-80 shadow-[0_6px_0_var(--color-brand-200)]"
-          >
-            <span className="text-5xl" aria-hidden="true">
-              {game.emoji}
-            </span>
-            <span className="font-bold">{game.label}</span>
-          </div>
-        ))}
-      </div>
-      <p className="rounded-full bg-white/80 px-5 py-2 text-lg font-bold">
-        <span aria-hidden="true">🚧 </span>Games are coming very soon!
-      </p>
-    </div>
-  );
-}

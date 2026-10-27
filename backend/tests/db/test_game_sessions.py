@@ -210,6 +210,34 @@ def test_answers_are_checked_by_the_server(
     assert shown[2]["correct_answer"] is None
 
 
+def test_round_details_leave_out_what_a_game_does_not_use(
+    db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
+) -> None:
+    """Prompt, answers and feedback have published shapes (for generated client types), and
+    fields another game would use are omitted rather than sent as null."""
+    session = start(db_client, headers, child, "word-sequence")
+    round_ = db_session.scalars(
+        select(SessionRound).where(
+            SessionRound.session_id == session["id"], SessionRound.round_index == 0
+        )
+    ).one()
+
+    response = db_client.post(
+        f"{SESSIONS}/{session['id']}/rounds/0/answer",
+        json={"answer": answer_for(round_, correct=True)},
+        headers=headers,
+    ).json()
+
+    length = len(round_.expected_answer["sequence"])
+    assert response["correct_answer"] == {"sequence": round_.expected_answer["sequence"]}
+    assert response["feedback"] == {"in_place": length, "length": length}
+    shown = db_client.get(f"{SESSIONS}/{session['id']}", headers=headers).json()["rounds"][0]
+    assert shown["given_answer"] == {"sequence": round_.expected_answer["sequence"]}
+    assert shown["prompt"]["answer_length"] == length
+    other = start(db_client, headers, child, "sound-detective")["rounds"][0]["prompt"]
+    assert set(other) == {"instruction", "stimulus", "options", "noise", "display_text"}
+
+
 def test_each_round_is_answered_once(
     db_client: TestClient, db_session: Session, child: Child, headers: dict[str, str]
 ) -> None:

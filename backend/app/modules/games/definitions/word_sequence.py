@@ -39,6 +39,7 @@ class WordSequence(GameDefinition):
                         "options": word_options(options),
                         "noise": None,
                         "display_text": None,
+                        "answer_length": length,
                     },
                     stimulus={"type": "speech_sequence", "texts": sequence},
                     expected={"sequence": sequence},

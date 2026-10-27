@@ -3,6 +3,9 @@ import { cleanup } from '@testing-library/react';
 
 import { forgetPendingSignup } from '../auth/pending';
 import { resetSessionForTests } from '../auth/session';
+import { installAudioPlayback } from './browserAudio';
+
+installAudioPlayback();
 
 afterEach(() => {
   cleanup();

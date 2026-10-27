@@ -182,9 +182,17 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
   `GET .../rounds/{i}/stimulus` returns WAV (16 kHz mono) with any background noise already mixed in at the
   round's signal-to-noise ratio (`prompt.noise = {kind, snr_db}` is for display only). It needs the bearer token:
   fetch it, then play a blob URL.
-- **Not included:** sound-effect files for Sound Detective. Put licensed files (e.g. CC0) named
-  `<sound_id>.wav|.mp3|.ogg` in `SOUNDS_DIR`; until then those rounds return 503 `sound_unavailable`. The old app's MP3s
-  have unknown licences, so they were not copied.
+- **Round shapes are published.** `prompt` (`PromptOut`), `given_answer`, `correct_answer` and `feedback` have
+  OpenAPI schemas, so the frontend uses generated types. A field a game doesn't use is left out of the JSON, not sent
+  as null. Word Sequence prompts include `answer_length` (how many words to tap). `GET /api/speech/status` is
+  typed too (`SpeechStatusOut`).
+- **Not included:** sound-effect files for Sound Detective (the other four games use the TTS voice and generated
+  noise). Put licensed files (e.g. CC0) in `SOUNDS_DIR` (e.g. `SOUNDS_DIR=~/.cache/hearmate/sounds` in `.env`),
+  named `<sound_id>.wav|.mp3|.ogg`, using the 24 ids in `content/bank.json` (`dog`, `cat`, `cow`, `duck`, `lion`,
+  `frog`, `bird`, `car_horn`, `train`, `airplane`, `bicycle_bell`, `ambulance`, `doorbell`, `phone`, `clock`, `vacuum`,
+  `tap`, `rain`, `thunder`, `wind`, `drum`, `piano`, `guitar`, `bell`). Any sample rate, mono or stereo (decoded to
+  16 kHz mono), at most 20 s; 1-4 s with silence trimmed and similar loudness works best. Until a file is there,
+  its rounds return 503 `sound_unavailable`. The old app's MP3s have unknown licences, so they were not copied.
 - **Not included:** LLM-generated extra content. The bank is the only source.
 
 ## Speech services

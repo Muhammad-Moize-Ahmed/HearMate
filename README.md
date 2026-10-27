@@ -19,7 +19,8 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 6 | Progress, reports and gamification: streaks, achievements, goals, parent/therapist reports | ✅ done |
 | 7a | Frontend foundations (router, API types, role layouts, guards) and sign-in screens | ✅ done |
 | 7b | Parent dashboard, child profiles and sign-in (username + PIN), goals | ✅ done |
-| 7c+ | Frontend: games, progress reports, care team, therapist and admin screens | ⏳ next |
+| 7c | Child play area and game player: all 5 games, microphone answers, results | ✅ done |
+| 7d+ | Frontend: progress reports, care team, therapist and admin screens | ⏳ next |
 | 8–9 | PWA/offline, deploy | planned |
 
 ## Tech stack
@@ -98,7 +99,8 @@ src/
   api/               generated schema, `api` (authenticated) and `publicApi` (sign-in) clients, ApiError
   auth/              session (in-memory tokens + refresh), AuthProvider, route guards, post-sign-in redirects
   features/          auth/ (login, sign up, verify email, forgot password), children/ (parent dashboard,
-                     child form, child page, child sign-in), goals/, home/ (other role homes), landing/
+                     child form, child page, child sign-in), goals/, play/ (child home, game player,
+                     answers, microphone recording, results), home/ (other role homes), landing/
   components/ui/     Button/LinkButton, TextField/PasswordField, fields (select, textarea, chips, segmented),
                      Alert, ConfirmDialog, ProgressBar, CodeInput, PinPad, Logo, Spinner
   lib/               avatars, dates (date-only values), useCooldown
@@ -114,7 +116,9 @@ src/
 | `/parent` | parents | dashboard: each child's week (games, minutes, streak) and sign-in status |
 | `/parent/children/new`, `/parent/children/:id/edit` | parents | child profile form |
 | `/parent/children/:id` | parents | the child's week, sign-in (username + PIN), goals, profile, delete |
-| `/therapist`, `/admin`, `/play` | that kind of account only | role areas (home pages for now) |
+| `/play` | children | game tiles with the child's level per skill, and their streak |
+| `/play/games/:slug` (`?session=` to resume) | children | the game player: intro, rounds, feedback, results |
+| `/therapist`, `/admin` | that kind of account only | role areas (home pages for now) |
 
 - **Sessions:** the access token is kept in memory only. On page load the app calls `/api/auth/refresh`, so the
   httpOnly cookie restores the sign-in. Because the backend ends the whole sign-in if a refresh token is used twice,
@@ -125,6 +129,18 @@ src/
   before they're sent). Goal edits send only the fields that changed, so an already-passed due date is kept.
   Deleting a child, removing their sign-in or deleting a goal asks for confirmation. Deleting a child also asks
   you to type their name.
+- **Game player:** the server owns each session; the client only sends answers (`{choice}`, `{sequence}` or a
+  recording) and shows what the server decides: right or wrong, points, the level change, streak and new badges.
+  The player is a small state machine (`play/playerReducer.ts`). The URL names the session, so a reload picks it
+  up again. Round audio is fetched with the token and played from a blob, and the next round's audio is fetched
+  ahead of time.
+  - **Speech Practice** records about 10 seconds at most and uploads the recording; the microphone is switched off
+    as soon as recording stops. If microphone permission is refused, if there's no microphone, or if the browser
+    can't record, the child sees a plain explanation and can choose another game. If the server has no speech
+    recognition, the game is marked "Not ready yet".
+  - **Missing audio:** if a Sound Detective file isn't installed (see the backend README, `SOUNDS_DIR`), the round
+    says so and lets the child pick another game; the session is abandoned, so levels aren't affected.
+  - Children never request therapist notes or learning plans (the backend refuses them to children too).
 - **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
   for PINs, emoji avatars, and animations switched off under "reduce motion".
 

@@ -1002,22 +1002,14 @@ export interface components {
              * Answer
              * @description Game-specific: {"choice": id}, {"sequence": [ids]} or {"transcript": text}
              */
-            answer: {
-                [key: string]: unknown;
-            };
+            answer: components["schemas"]["ChoiceAnswer"] | components["schemas"]["SequenceAnswer"] | components["schemas"]["SpeechAnswer"];
             /** Response Time Ms */
             response_time_ms?: number | null;
         };
         /** AnswerOut */
         AnswerOut: {
-            /** Correct Answer */
-            correct_answer: {
-                [key: string]: unknown;
-            };
-            /** Feedback */
-            feedback: {
-                [key: string]: unknown;
-            };
+            correct_answer: components["schemas"]["CorrectAnswerOut"];
+            feedback: components["schemas"]["FeedbackOut"];
             /** Index */
             index: number;
             /** Is Correct */
@@ -1232,6 +1224,11 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
         };
+        /** ChoiceAnswer */
+        ChoiceAnswer: {
+            /** Choice */
+            choice: string;
+        };
         /** ContrastOut */
         ContrastOut: {
             /** Accuracy */
@@ -1240,6 +1237,23 @@ export interface components {
             contrast: string;
             /** Rounds */
             rounds: number;
+        };
+        /** CorrectAnswerOut */
+        CorrectAnswerOut: {
+            /** Choice */
+            choice?: string | null;
+            /**
+             * Contrast
+             * @description Similar sounds: the sound contrast
+             */
+            contrast?: string | null;
+            /** Sequence */
+            sequence?: string[] | null;
+            /**
+             * Text
+             * @description Speech practice: what to say
+             */
+            text?: string | null;
         };
         /** DayOut */
         DayOut: {
@@ -1286,6 +1300,35 @@ export interface components {
             /** Display Name */
             display_name: string;
             this_week: components["schemas"]["Totals"];
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Contrast */
+            contrast?: string | null;
+            /**
+             * Heard
+             * @description Speech practice: what was recognised
+             */
+            heard?: string | null;
+            /**
+             * In Place
+             * @description Word sequence: words in the right place
+             */
+            in_place?: number | null;
+            /** Length */
+            length?: number | null;
+            /**
+             * Practise Sounds
+             * @description ARPAbet sounds missed
+             */
+            practise_sounds?: string[] | null;
+            /**
+             * Score
+             * @description Speech practice: 0-100
+             */
+            score?: number | null;
+            /** Words */
+            words?: components["schemas"]["WordFeedbackOut"][] | null;
         };
         /**
          * FocusArea
@@ -1339,6 +1382,15 @@ export interface components {
          * @enum {string}
          */
         Gender: "female" | "male" | "other" | "undisclosed";
+        /** GivenAnswerOut */
+        GivenAnswerOut: {
+            /** Choice */
+            choice?: string | null;
+            /** Sequence */
+            sequence?: string[] | null;
+            /** Transcript */
+            transcript?: string | null;
+        };
         /** GoalCreateIn */
         GoalCreateIn: {
             category?: components["schemas"]["SkillCategory"] | null;
@@ -1535,6 +1587,20 @@ export interface components {
             /** Snr Range Db */
             snr_range_db: string;
         };
+        /**
+         * NoiseKind
+         * @enum {string}
+         */
+        NoiseKind: "white" | "pink";
+        /** NoiseOut */
+        NoiseOut: {
+            kind: components["schemas"]["NoiseKind"];
+            /**
+             * Snr Db
+             * @description Signal-to-noise ratio; lower is harder
+             */
+            snr_db: number;
+        };
         /** NoteIn */
         NoteIn: {
             /** Body */
@@ -1565,6 +1631,13 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** OptionOut */
+        OptionOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
         };
         /** ParentBriefOut */
         ParentBriefOut: {
@@ -1696,6 +1769,29 @@ export interface components {
             /** Skills */
             skills: components["schemas"]["SkillProgressOut"][];
         };
+        /** PromptOut */
+        PromptOut: {
+            /**
+             * Answer Length
+             * @description Word sequence: how many words to tap
+             */
+            answer_length?: number | null;
+            /**
+             * Display Text
+             * @description Text to show (speech practice)
+             */
+            display_text: string | null;
+            /** Instruction */
+            instruction: string;
+            /** @description For display only: already in the audio */
+            noise: components["schemas"]["NoiseOut"] | null;
+            /**
+             * Options
+             * @description Empty for speech games
+             */
+            options: components["schemas"]["OptionOut"][];
+            stimulus: components["schemas"]["StimulusOut"];
+        };
         /** RejectTherapistIn */
         RejectTherapistIn: {
             /** Reason */
@@ -1717,25 +1813,19 @@ export interface components {
         RoundOut: {
             /** Answered */
             answered: boolean;
-            /**
-             * Correct Answer
-             * @description Shown once the round is answered or the session has ended
-             */
-            correct_answer: {
-                [key: string]: unknown;
-            } | null;
-            /** Given Answer */
-            given_answer: {
-                [key: string]: unknown;
-            } | null;
+            /** @description Shown once the round is answered or the session has ended */
+            correct_answer: components["schemas"]["CorrectAnswerOut"] | null;
+            given_answer: components["schemas"]["GivenAnswerOut"] | null;
             /** Index */
             index: number;
             /** Is Correct */
             is_correct: boolean | null;
-            /** Prompt */
-            prompt: {
-                [key: string]: unknown;
-            };
+            prompt: components["schemas"]["PromptOut"];
+        };
+        /** SequenceAnswer */
+        SequenceAnswer: {
+            /** Sequence */
+            sequence: string[];
         };
         /** SessionGameOut */
         SessionGameOut: {
@@ -1898,6 +1988,11 @@ export interface components {
              */
             sound: string;
         };
+        /** SpeechAnswer */
+        SpeechAnswer: {
+            /** Transcript */
+            transcript: string;
+        };
         /**
          * SpeechChallenge
          * @enum {string}
@@ -1911,6 +2006,13 @@ export interface components {
             average_score: number | null;
             /** Sounds To Practise */
             sounds_to_practise: components["schemas"]["SoundToPractiseOut"][];
+        };
+        /** SpeechStatusOut */
+        SpeechStatusOut: {
+            /** @description Server speech recognition (spoken answers) */
+            stt: components["schemas"]["SttStatusOut"];
+            /** @description Server speech audio (words and sentences) */
+            tts: components["schemas"]["TtsStatusOut"];
         };
         /** StartSessionIn */
         StartSessionIn: {
@@ -1926,6 +2028,26 @@ export interface components {
              * @default false
              */
             with_noise: boolean;
+        };
+        /** StimulusOut */
+        StimulusOut: {
+            /**
+             * Audio Url
+             * @description WAV with any noise mixed in; needs the bearer token
+             */
+            audio_url: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "sound" | "speech" | "speech_sequence";
+        };
+        /** SttStatusOut */
+        SttStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Provider */
+            provider: string | null;
         };
         /**
          * TherapistApprovalStatus
@@ -2045,6 +2167,13 @@ export interface components {
             /** Sessions */
             sessions: number;
         };
+        /** TtsStatusOut */
+        TtsStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Voice */
+            voice: string | null;
+        };
         /** UserMeOut */
         UserMeOut: {
             /** Email */
@@ -2089,6 +2218,17 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** WordFeedbackOut */
+        WordFeedbackOut: {
+            /** Expected */
+            expected: string;
+            /** Heard */
+            heard: string | null;
+            /** Missed Sounds */
+            missed_sounds: string[];
+            /** Score */
+            score: number;
         };
         /** ChildLoginIn */
         app__modules__auth__schemas__ChildLoginIn: {
@@ -3867,9 +4007,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SpeechStatusOut"];
                 };
             };
         };

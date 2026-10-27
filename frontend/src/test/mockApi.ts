@@ -62,7 +62,7 @@ export function mockApi(routes: Record<string, Handler | Reply>) {
     const call: RecordedCall = {
       method: request.method,
       path: url.pathname,
-      body: text ? JSON.parse(text) : undefined,
+      body: text ? parseBody(text) : undefined,
       headers: request.headers,
     };
     calls.push(call);
@@ -84,4 +84,13 @@ export function mockApi(routes: Record<string, Handler | Reply>) {
     /** Calls to one endpoint, e.g. callsTo('POST /api/auth/login'). */
     callsTo: (route: string) => calls.filter((c) => `${c.method} ${c.path}` === route),
   };
+}
+
+/** JSON bodies are parsed; anything else (e.g. recorded audio) is kept as text. */
+function parseBody(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }

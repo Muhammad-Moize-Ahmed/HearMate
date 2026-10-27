@@ -1,6 +1,6 @@
 import uuid
 from http import HTTPStatus
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +17,7 @@ from .schemas import (
     SessionSummaryOut,
     SkillLevelOut,
     Slug,
+    SpeechStatusOut,
     StartSessionIn,
 )
 from .service import GameSessionService
@@ -191,10 +192,10 @@ async def _read_limited(request: Request, max_bytes: int) -> bytes:
 
 
 @speech_router.get("/status")
-def speech_status(speech: Speech, _: CurrentPrincipal) -> dict[str, Any]:
+def speech_status(speech: Speech, _: CurrentPrincipal) -> SpeechStatusOut:
     """Whether server speech recognition and speech audio are set up (so the app can fall
     back to the browser's own speech features if not)."""
-    return speech.status()
+    return SpeechStatusOut.model_validate(speech.status())
 
 
 @child_progress_router.get("/sessions")

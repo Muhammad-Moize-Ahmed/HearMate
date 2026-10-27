@@ -45,10 +45,19 @@
         "additionalProperties": false,
         "properties": {
           "answer": {
-            "additionalProperties": true,
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChoiceAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SequenceAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SpeechAnswer"
+              }
+            ],
             "description": "Game-specific: {\"choice\": id}, {\"sequence\": [ids]} or {\"transcript\": text}",
-            "title": "Answer",
-            "type": "object"
+            "title": "Answer"
           },
           "response_time_ms": {
             "anyOf": [
@@ -73,14 +82,10 @@
       "AnswerOut": {
         "properties": {
           "correct_answer": {
-            "additionalProperties": true,
-            "title": "Correct Answer",
-            "type": "object"
+            "$ref": "#/components/schemas/CorrectAnswerOut"
           },
           "feedback": {
-            "additionalProperties": true,
-            "title": "Feedback",
-            "type": "object"
+            "$ref": "#/components/schemas/FeedbackOut"
           },
           "index": {
             "title": "Index",
@@ -782,6 +787,22 @@
         "title": "ChildUpdateIn",
         "type": "object"
       },
+      "ChoiceAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "choice": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Choice",
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice"
+        ],
+        "title": "ChoiceAnswer",
+        "type": "object"
+      },
       "ContrastOut": {
         "properties": {
           "accuracy": {
@@ -803,6 +824,61 @@
           "accuracy"
         ],
         "title": "ContrastOut",
+        "type": "object"
+      },
+      "CorrectAnswerOut": {
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "contrast": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Similar sounds: the sound contrast",
+            "title": "Contrast"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Speech practice: what to say",
+            "title": "Text"
+          }
+        },
+        "title": "CorrectAnswerOut",
         "type": "object"
       },
       "DayOut": {
@@ -906,6 +982,99 @@
           "achievements_unlocked"
         ],
         "title": "FamilyMemberOut",
+        "type": "object"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "contrast": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrast"
+          },
+          "heard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Speech practice: what was recognised",
+            "title": "Heard"
+          },
+          "in_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Word sequence: words in the right place",
+            "title": "In Place"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          },
+          "practise_sounds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ARPAbet sounds missed",
+            "title": "Practise Sounds"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Speech practice: 0-100",
+            "title": "Score"
+          },
+          "words": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WordFeedbackOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Words"
+          }
+        },
+        "title": "FeedbackOut",
         "type": "object"
       },
       "FocusArea": {
@@ -1047,6 +1216,48 @@
         ],
         "title": "Gender",
         "type": "string"
+      },
+      "GivenAnswerOut": {
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          }
+        },
+        "title": "GivenAnswerOut",
+        "type": "object"
       },
       "GoalCreateIn": {
         "additionalProperties": false,
@@ -1588,6 +1799,32 @@
         "title": "NoiseBandOut",
         "type": "object"
       },
+      "NoiseKind": {
+        "enum": [
+          "white",
+          "pink"
+        ],
+        "title": "NoiseKind",
+        "type": "string"
+      },
+      "NoiseOut": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoiseKind"
+          },
+          "snr_db": {
+            "description": "Signal-to-noise ratio; lower is harder",
+            "title": "Snr Db",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "snr_db"
+        ],
+        "title": "NoiseOut",
+        "type": "object"
+      },
       "NoteIn": {
         "additionalProperties": false,
         "properties": {
@@ -1643,6 +1880,24 @@
           "updated_at"
         ],
         "title": "NoteOut",
+        "type": "object"
+      },
+      "OptionOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "OptionOut",
         "type": "object"
       },
       "ParentBriefOut": {
@@ -2033,6 +2288,69 @@
         "title": "ProgressSummaryOut",
         "type": "object"
       },
+      "PromptOut": {
+        "properties": {
+          "answer_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Word sequence: how many words to tap",
+            "title": "Answer Length"
+          },
+          "display_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Text to show (speech practice)",
+            "title": "Display Text"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoiseOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For display only: already in the audio"
+          },
+          "options": {
+            "description": "Empty for speech games",
+            "items": {
+              "$ref": "#/components/schemas/OptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "stimulus": {
+            "$ref": "#/components/schemas/StimulusOut"
+          }
+        },
+        "required": [
+          "instruction",
+          "stimulus",
+          "options",
+          "noise",
+          "display_text"
+        ],
+        "title": "PromptOut",
+        "type": "object"
+      },
       "RejectTherapistIn": {
         "additionalProperties": false,
         "properties": {
@@ -2086,27 +2404,23 @@
           "correct_answer": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/CorrectAnswerOut"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Shown once the round is answered or the session has ended",
-            "title": "Correct Answer"
+            "description": "Shown once the round is answered or the session has ended"
           },
           "given_answer": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/GivenAnswerOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Given Answer"
+            ]
           },
           "index": {
             "title": "Index",
@@ -2124,9 +2438,7 @@
             "title": "Is Correct"
           },
           "prompt": {
-            "additionalProperties": true,
-            "title": "Prompt",
-            "type": "object"
+            "$ref": "#/components/schemas/PromptOut"
           }
         },
         "required": [
@@ -2138,6 +2450,26 @@
           "correct_answer"
         ],
         "title": "RoundOut",
+        "type": "object"
+      },
+      "SequenceAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Sequence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sequence"
+        ],
+        "title": "SequenceAnswer",
         "type": "object"
       },
       "SessionGameOut": {
@@ -2579,6 +2911,21 @@
         "title": "SoundToPractiseOut",
         "type": "object"
       },
+      "SpeechAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "transcript": {
+            "maxLength": 500,
+            "title": "Transcript",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transcript"
+        ],
+        "title": "SpeechAnswer",
+        "type": "object"
+      },
       "SpeechChallenge": {
         "enum": [
           "pronunciation",
@@ -2625,6 +2972,24 @@
         "title": "SpeechReportOut",
         "type": "object"
       },
+      "SpeechStatusOut": {
+        "properties": {
+          "stt": {
+            "$ref": "#/components/schemas/SttStatusOut",
+            "description": "Server speech recognition (spoken answers)"
+          },
+          "tts": {
+            "$ref": "#/components/schemas/TtsStatusOut",
+            "description": "Server speech audio (words and sentences)"
+          }
+        },
+        "required": [
+          "stt",
+          "tts"
+        ],
+        "title": "SpeechStatusOut",
+        "type": "object"
+      },
       "StartSessionIn": {
         "additionalProperties": false,
         "properties": {
@@ -2649,6 +3014,55 @@
           "game"
         ],
         "title": "StartSessionIn",
+        "type": "object"
+      },
+      "StimulusOut": {
+        "properties": {
+          "audio_url": {
+            "description": "WAV with any noise mixed in; needs the bearer token",
+            "title": "Audio Url",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "sound",
+              "speech",
+              "speech_sequence"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "audio_url"
+        ],
+        "title": "StimulusOut",
+        "type": "object"
+      },
+      "SttStatusOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "required": [
+          "provider",
+          "available"
+        ],
+        "title": "SttStatusOut",
         "type": "object"
       },
       "TherapistApprovalStatus": {
@@ -2989,6 +3403,31 @@
         "title": "Totals",
         "type": "object"
       },
+      "TtsStatusOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice"
+          }
+        },
+        "required": [
+          "voice",
+          "available"
+        ],
+        "title": "TtsStatusOut",
+        "type": "object"
+      },
       "UserMeOut": {
         "properties": {
           "email": {
@@ -3104,6 +3543,44 @@
           "code"
         ],
         "title": "VerifyEmailIn",
+        "type": "object"
+      },
+      "WordFeedbackOut": {
+        "properties": {
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          },
+          "heard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heard"
+          },
+          "missed_sounds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missed Sounds",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "expected",
+          "heard",
+          "score",
+          "missed_sounds"
+        ],
+        "title": "WordFeedbackOut",
         "type": "object"
       },
       "app__modules__auth__schemas__ChildLoginIn": {
@@ -6113,9 +6590,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Speech Status Api Speech Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SpeechStatusOut"
                 }
               }
             },

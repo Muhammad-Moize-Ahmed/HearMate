@@ -268,7 +268,7 @@ class GameSessionService:
             raise ConflictError("This round has already been answered", code="already_answered")
 
         try:
-            answer = definition.answer_model.model_validate(body.answer)
+            answer = definition.answer_model.model_validate(body.answer.model_dump())
         except ValidationError as exc:
             raise AnswerValidationError(
                 "The answer doesn't fit this game",
