@@ -14,7 +14,7 @@ export function ChildLayout() {
   if (principal.kind !== 'child') return null; // the route guard only lets children in
 
   return (
-    <div className="flex min-h-dvh flex-col bg-linear-to-b from-sky-soft via-brand-50 to-sun-200/60">
+    <div className="flex min-h-dvh flex-col pt-safe pb-safe bg-linear-to-b from-sky-soft via-brand-50 to-sun-200/60">
       <header className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-4">
         <Logo showName={false} />
         <div className="flex items-center gap-2 rounded-full bg-white/80 py-1 pr-4 pl-1 shadow-sm">

@@ -4,6 +4,7 @@ import { Link, Outlet } from 'react-router';
 import { useAuth, usePrincipal } from '../../auth/context';
 import { Button } from '../../components/ui/Button';
 import { Logo } from '../../components/ui/Logo';
+import { InstallPrompt } from '../../pwa/InstallPrompt';
 
 type RoleLayoutProps = {
   /** Shown as a badge next to the logo, e.g. "Parent". */
@@ -21,8 +22,8 @@ export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
   const name = principal.kind === 'child' ? principal.display_name : principal.first_name;
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-10 print:hidden border-b-2 border-brand-100 bg-white/90 backdrop-blur">
+    <div className="flex min-h-dvh flex-col pb-safe">
+      <header className="sticky top-0 z-10 pt-safe print:hidden border-b-2 border-brand-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <Link to={home} className="rounded-2xl" aria-label="Home">
@@ -48,6 +49,7 @@ export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10 print:max-w-none print:p-0">
+        {principal.kind === 'parent' && <InstallPrompt />}
         <Outlet />
       </main>
     </div>

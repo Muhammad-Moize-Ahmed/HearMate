@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
 import { ApiError } from '../../api/client';
+import { setGameActive } from '../../lib/gameActivity';
+import { isOnline, subscribeOnline, useOnline } from '../../lib/network';
 import {
   abandonSession,
   answerRound,
@@ -26,17 +28,62 @@ type Options = {
   onStarted: (sessionId: string) => void;
 };
 
-/** Runs one game session against the server. The client only ever sends answers. */
+/** Phases where a session is under way: a reload or an interruption would cut into the game. */
+const IN_GAME = new Set<PlayerState['phase']>(['round', 'checking', 'feedback', 'completing']);
+
+/**
+ * Runs one game session against the server. The client only ever sends answers.
+ *
+ * Offline: a game can't start, and nothing is sent or queued. If the connection drops mid-game the
+ * player pauses (`paused`); when it's back, the session is read again from the server, exactly as
+ * when resuming after a reload, and the game carries on from the first unanswered round.
+ */
 export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Options) {
   const queryClient = useQueryClient();
+  const online = useOnline();
   const [state, dispatch] = useReducer(
     playerReducer,
     resumeSessionId ? ({ phase: 'loading' } as const) : ({ phase: 'intro' } as const),
   );
+  const inGame = IN_GAME.has(state.phase);
+
+  // Tell the rest of the app (update prompt, offline banner) not to interrupt.
+  useEffect(() => setGameActive(inGame), [inGame]);
+  useEffect(() => () => setGameActive(false), []);
+
+  // Back online after a drop: re-read the session (the resume path) before letting the child answer,
+  // so an answer the server got just before the drop isn't asked again.
+  const [resyncing, setResyncing] = useState(false);
+  const latest = useRef(state);
+  useEffect(() => {
+    latest.current = state;
+  });
+  useEffect(
+    () =>
+      subscribeOnline((nowOnline) => {
+        const current = latest.current;
+        if (!nowOnline) return;
+        if (current.phase === 'completing' && current.error) {
+          dispatch({ type: 'retry-complete' });
+          return;
+        }
+        // Feedback already has its result; an answer still on its way settles by itself.
+        if (current.phase !== 'round') return;
+        setResyncing(true);
+        getSession(current.session.id)
+          .then(
+            (fresh) => dispatch({ type: 'session', session: fresh }),
+            () => undefined, // couldn't re-read: carry on from where the child was
+          )
+          .finally(() => setResyncing(false));
+      }),
+    [],
+  );
 
   // Resume: a session from another game, or one that can't be read, starts fresh instead.
+  // Offline, it waits for the connection rather than giving up on the session.
   useEffect(() => {
-    if (state.phase !== 'loading' || !resumeSessionId) return;
+    if (state.phase !== 'loading' || !resumeSessionId || !online) return;
     let active = true;
     getSession(resumeSessionId).then(
       (session) => {
@@ -52,7 +99,7 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
     return () => {
       active = false;
     };
-  }, [state.phase, resumeSessionId, slug, childId]);
+  }, [state.phase, resumeSessionId, slug, childId, online]);
 
   // How long the child took: from the round appearing to the answer.
   const shownAt = useRef(0);
@@ -67,7 +114,7 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
   const completing = useRef<string | null>(null);
   const completingId = state.phase === 'completing' && !state.error ? state.session.id : null;
   useEffect(() => {
-    if (completingId === null || completing.current === completingId) return;
+    if (completingId === null || completing.current === completingId || !online) return;
     completing.current = completingId;
     completeSession(completingId).then(
       (session) => {
@@ -81,10 +128,11 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
         dispatch({ type: 'complete-failed', error });
       },
     );
-  }, [completingId, childId, queryClient]);
+  }, [completingId, childId, queryClient, online]);
 
   const start = useCallback(
     (withNoise: boolean) => {
+      if (!isOnline()) return; // the intro says why
       dispatch({ type: 'start' });
       startSession({ child_id: childId, game: slug, with_noise: withNoise }).then(
         (session) => {
@@ -99,7 +147,8 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
 
   const submit = useCallback(
     (send: (sessionId: string, index: number, ms: number) => Promise<AnswerResult>) => {
-      if (state.phase !== 'round') return;
+      // Offline, answers are never queued: the player is paused until the connection is back.
+      if (state.phase !== 'round' || !isOnline() || resyncing) return;
       const { session, index } = state;
       dispatch({ type: 'answering' });
       send(session.id, index, elapsed()).then(
@@ -114,7 +163,7 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
         },
       );
     },
-    [state],
+    [state, resyncing],
   );
 
   const answer = useCallback(
@@ -135,6 +184,9 @@ export function useGamePlayer({ childId, slug, resumeSessionId, onStarted }: Opt
 
   return {
     state: state as PlayerState,
+    online,
+    /** Mid-game with no connection (or catching up after one): show "reconnecting", take no answers. */
+    paused: inGame && (!online || resyncing),
     start,
     answer,
     answerSpeech,

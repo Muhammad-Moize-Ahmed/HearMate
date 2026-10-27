@@ -22,13 +22,14 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 7c | Child play area and game player: all 5 games, microphone answers, results | ✅ done |
 | 7d | Progress charts, printable reports, the child's "My progress", route-based code splitting | ✅ done |
 | 7e | Care team (invite/revoke per child), therapist dashboard, notes and learning plans, admin approvals | ✅ done |
-| 8–9 | PWA/offline, deploy | ⏳ next |
+| 8 | PWA and offline: installable app, precached shell, update prompt, offline-safe games and pages | ✅ done |
+| 9 | Testing and deployment | ⏳ next |
 
 ## Tech stack
 
 - **Frontend:** React 19, TypeScript (strict), Vite, Tailwind CSS v4, React Router 7, TanStack Query 5,
   openapi-fetch + openapi-typescript (API types generated from the backend), react-hook-form + zod,
-  visx (scale, shape, axis, group) for SVG charts;
+  visx (scale, shape, axis, group) for SVG charts, vite-plugin-pwa + workbox-window (service worker);
   Vitest + Testing Library, ESLint + Prettier
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 17 (psycopg 3), pydantic-settings; pytest, ruff, mypy (strict)
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for Python, [pnpm](https://pnpm.io/) for Node, Docker Compose, pre-commit + gitleaks, GitHub Actions
@@ -37,7 +38,7 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 
 ```
 backend/     FastAPI service (app/, tests/, pyproject.toml, uv.lock)
-frontend/    React + Vite app (src/, package.json, pnpm-lock.yaml)
+frontend/    React + Vite app (src/, package.json, pnpm-lock.yaml); README.md covers the PWA and offline use
 docs/        PLAN.md: analysis of the old app and the rebuild roadmap
 .github/     CI workflow
 docker-compose.yml   local PostgreSQL
@@ -109,7 +110,9 @@ src/
                      admin/ (approvals, therapist accounts), home/, landing/
   components/ui/     Button/LinkButton, TextField/PasswordField, fields (select, textarea, chips, segmented),
                      Alert, ConfirmDialog, ProgressBar, CodeInput, PinPad, Logo, Spinner
-  lib/               avatars, dates (date-only values), useCooldown
+  lib/               avatars, dates (date-only values), useCooldown, network (online/offline), gameActivity
+  pwa/               manifest + service worker options, registration, update prompt, install prompt,
+                     offline indicator, cache clean-up on sign-out
   test/              mockApi (fake backend for tests), fixtures (parent, play, progress), renderApp
 ```
 
@@ -183,6 +186,11 @@ src/
   (visx) load with the pages that use them. Main JS bundle: 583 kB → 362 kB minified (177 → 114 kB gzipped) in 7d;
   372 kB (117 kB gzipped) after 7e, which now also holds the JSX runtime that used to be a separate 9 kB chunk the
   shell always loaded. The charts chunk is 27 kB gzipped; the therapist and admin pages are 2–3 kB gzipped each.
+- **PWA and offline:** installable (manifest, icons in `public/icons/`, iOS tags). In a production build a service
+  worker precaches the app shell and every route's chunk, never `/api` responses or audio. New versions wait for
+  "Refresh", which never interrupts a game. Games can't start offline; a game that loses its connection pauses and
+  carries on afterwards without queueing answers. Adult pages refetch by themselves when back online. Details and how
+  to test it locally are in [frontend/README.md](frontend/README.md).
 - **Child-friendly:** a rounded system font (nothing downloaded), every button at least 48 px tall, a big number pad
   for PINs, emoji avatars, and animations switched off under "reduce motion".
 

@@ -2,6 +2,7 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { AuthProvider } from '../auth/AuthProvider';
+import { AppNotices } from '../pwa/AppNotices';
 
 export function Providers({
   queryClient,
@@ -12,7 +13,10 @@ export function Providers({
 }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        <AppNotices />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

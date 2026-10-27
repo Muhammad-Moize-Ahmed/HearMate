@@ -5,7 +5,7 @@ import { Logo } from '../../components/ui/Logo';
 /** Sign-in screens: a playful background, the logo, and the screen's card in the middle. */
 export function AuthLayout() {
   return (
-    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden">
+    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden pt-safe pb-safe">
       <Decorations />
       <header className="px-4 pt-5 sm:px-8">
         <Link to="/" className="inline-block rounded-2xl" aria-label="HearMate home">

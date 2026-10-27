@@ -7,6 +7,7 @@ import { Alert } from '../../components/ui/Alert';
 import { Button, LinkButton } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Spinner } from '../../components/ui/Spinner';
+import { useOnline } from '../../lib/network';
 import { ChoiceAnswer, SequenceAnswer, SpeechAnswer } from './answers';
 import {
   useGames,
@@ -27,7 +28,9 @@ export function GamePlayerPage() {
   const { slug = '' } = useParams();
   const principal = usePrincipal();
   const games = useGames();
+  const online = useOnline();
 
+  if (games.isPending && !online) return <NeedsInternet />;
   if (games.isPending) return <Centered>Getting the game ready…</Centered>;
   if (games.isError) {
     return (
@@ -87,31 +90,36 @@ function Player({ game, childId }: { game: Game; childId: string }) {
         )}
       </header>
 
-      {state.phase === 'loading' && <Centered>Getting back to your game…</Centered>}
+      {state.phase === 'loading' &&
+        (player.online ? <Centered>Getting back to your game…</Centered> : <Reconnecting />)}
       {(state.phase === 'intro' || state.phase === 'starting') && (
         <Intro
           game={game}
           childId={childId}
+          online={player.online}
           starting={state.phase === 'starting'}
           error={state.phase === 'intro' ? state.error : undefined}
           onStart={player.start}
         />
       )}
-      {(state.phase === 'round' || state.phase === 'checking' || state.phase === 'feedback') && (
-        <RoundScreen
-          game={game}
-          session={state.session}
-          index={state.index}
-          checking={state.phase === 'checking'}
-          error={state.phase === 'round' ? state.error : undefined}
-          feedback={state.phase === 'feedback' ? state.result : undefined}
-          onAnswer={player.answer}
-          onSpeech={player.answerSpeech}
-          onNext={player.next}
-          onLeave={() => void leave()}
-        />
-      )}
-      {state.phase === 'completing' &&
+      {player.paused && <Reconnecting />}
+      {!player.paused &&
+        (state.phase === 'round' || state.phase === 'checking' || state.phase === 'feedback') && (
+          <RoundScreen
+            game={game}
+            session={state.session}
+            index={state.index}
+            checking={state.phase === 'checking'}
+            error={state.phase === 'round' ? state.error : undefined}
+            feedback={state.phase === 'feedback' ? state.result : undefined}
+            onAnswer={player.answer}
+            onSpeech={player.answerSpeech}
+            onNext={player.next}
+            onLeave={() => void leave()}
+          />
+        )}
+      {!player.paused &&
+        state.phase === 'completing' &&
         (state.error ? (
           <Problem emoji="😕" title="We couldn't save your game.">
             <p className="text-ink-soft">{describeError(state.error)}</p>
@@ -144,12 +152,14 @@ function Player({ game, childId }: { game: Game; childId: string }) {
 function Intro({
   game,
   childId,
+  online,
   starting,
   error,
   onStart,
 }: {
   game: Game;
   childId: string;
+  online: boolean;
   starting: boolean;
   error: Error | undefined;
   onStart: (withNoise: boolean) => void;
@@ -191,8 +201,14 @@ function Intro({
           <span aria-hidden="true">🎤 </span>You'll need the microphone for this one.
         </p>
       )}
-      {error && <Alert tone="error">{describeError(error)}</Alert>}
-      {speechMissing ? (
+      {error && online && <Alert tone="error">{describeError(error)}</Alert>}
+      {!online ? (
+        <Alert tone="info">
+          <span aria-hidden="true">📡 </span>
+          We need the internet to play. Ask a grown-up to check the Wi-Fi. The game can start as
+          soon as it's back!
+        </Alert>
+      ) : speechMissing ? (
         <Alert tone="info">Speaking games aren't ready yet. Ask a grown-up to set them up.</Alert>
       ) : (
         <Button variant="sunny" size="xl" loading={starting} onClick={() => onStart(withNoise)}>
@@ -321,6 +337,34 @@ function Progress({ done, total }: { done: number; total: number }) {
         />
       ))}
     </div>
+  );
+}
+
+/** Mid-game with no connection: nothing is lost, and the game carries on when it's back. */
+function Reconnecting() {
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center gap-4 rounded-[2rem] bg-white/90 p-6 text-center shadow-sm"
+    >
+      <span className="text-6xl" aria-hidden="true">
+        📡
+      </span>
+      <p className="text-2xl font-black">Oops, the internet went away.</p>
+      <p className="max-w-sm text-xl">Your game is saved. We'll keep going when it's back!</p>
+      <p className="flex items-center gap-2 font-bold text-ink-soft">
+        <Spinner className="size-6 text-brand-600" /> Reconnecting…
+      </p>
+    </div>
+  );
+}
+
+/** Opening a game with no connection (and nothing loaded yet). */
+function NeedsInternet() {
+  return (
+    <Problem emoji="📡" title="We need the internet to play.">
+      <p className="text-xl">Ask a grown-up to check the Wi-Fi. Your games will be here!</p>
+    </Problem>
   );
 }
 

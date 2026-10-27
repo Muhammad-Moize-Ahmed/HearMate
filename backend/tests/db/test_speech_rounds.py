@@ -159,6 +159,64 @@ def test_sound_stimuli_need_installed_sound_files(
     assert read_wav(installed.content).duration_ms == 1000
 
 
+def _riff_chunks(wav: bytes) -> list[bytes]:
+    """The chunk ids in a WAV file (after the RIFF/WAVE header)."""
+    ids, at = [], 12
+    while at + 8 <= len(wav):
+        ids.append(wav[at : at + 4])
+        at += 8 + int.from_bytes(wav[at + 4 : at + 8], "little") + (wav[at + 4] & 1)
+    return ids
+
+
+@pytest.mark.parametrize("game", ["sound-detective", "similar-sounds", "word-sequence"])
+def test_round_audio_never_reveals_the_answer(
+    db_client: TestClient,
+    db_session: Session,
+    app: FastAPI,
+    child: Child,
+    headers: dict[str, str],
+    tmp_path: Path,
+    test_settings: Settings,
+    game: str,
+) -> None:
+    session = start(db_client, headers, child, game)
+    for index, shown in enumerate(session["rounds"]):
+        stored = stored_round(db_session, session["id"], index)
+        if game == "sound-detective":
+            sound_id = stored.stimulus["sound_id"]
+            (tmp_path / f"{sound_id}.wav").write_bytes(tone_wav(seconds=0.2))
+            app.state.settings = test_settings.model_copy(update={"SOUNDS_DIR": tmp_path})
+        # Everything that would give the answer away: the word or sound, the expected answer,
+        # and every option shown.
+        stimulus = stored.stimulus
+        secrets = {
+            str(v).lower()
+            for v in [
+                stimulus.get("sound_id"),
+                stimulus.get("text"),
+                *stimulus.get("texts", []),
+                stored.expected_answer.get("choice"),
+                *stored.expected_answer.get("sequence", []),
+                *(o["id"] for o in stored.prompt.get("options", [])),
+                *(o["label"] for o in stored.prompt.get("options", [])),
+            ]
+            if v
+        }
+        assert secrets
+
+        url = shown["prompt"]["stimulus"]["audio_url"]
+        # The URL is only the session's random id and the round number.
+        assert url == f"{SESSIONS}/{session['id']}/rounds/{index}/stimulus"
+        response = db_client.get(url, headers=headers)
+        assert response.status_code == 200, response.text
+
+        assert "content-disposition" not in response.headers  # no filename
+        sent = " ".join(f"{k}: {v}" for k, v in response.headers.items()).lower()
+        assert not [s for s in secrets if s in sent], sent
+        # Re-encoded from samples: format and audio only, no metadata (title, source filename).
+        assert _riff_chunks(response.content) == [b"fmt ", b"data"]
+
+
 def test_other_families_cannot_fetch_the_audio(
     db_client: TestClient,
     db_session: Session,

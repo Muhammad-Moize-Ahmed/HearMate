@@ -95,13 +95,19 @@ export function refreshSession(): Promise<Session | null> {
   return inFlight;
 }
 
-let restoring: Promise<void> | null = null;
+let restoring: Promise<boolean> | null = null;
 
-/** On page load: pick up an existing sign-in from the cookie. Runs once, however often called. */
-export function restoreSession(): Promise<void> {
+/**
+ * On page load: pick up an existing sign-in from the cookie. Runs once, however often called.
+ * Resolves false when the server couldn't be reached (offline or down); a later call tries again.
+ */
+export function restoreSession(): Promise<boolean> {
   restoring ??= refreshSession().then(
-    () => undefined,
-    () => undefined, // offline or server down: start signed out; signing in will say why
+    () => true,
+    () => {
+      restoring = null;
+      return false;
+    },
   );
   return restoring;
 }

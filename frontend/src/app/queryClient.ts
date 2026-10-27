@@ -11,7 +11,9 @@ export function createQueryClient(): QueryClient {
           !(error instanceof ApiError && error.status < 500) && failureCount < 2,
         staleTime: 30_000,
       },
-      mutations: { retry: false },
+      // Offline, a change fails straight away with "check your connection" instead of waiting in a
+      // hidden queue and being sent later without the user knowing.
+      mutations: { retry: false, networkMode: 'always' },
     },
   });
 }

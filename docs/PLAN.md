@@ -251,9 +251,12 @@ new-project/
   - Admin (approve therapists, manage users and games).
 
 ### Phase 8: PWA and offline use (a stated SRS objective)
-- vite-plugin-pwa with real icons. Precache the app shell, game audio and the content bank.
-- An offline **answer queue** in IndexedDB that syncs when the device reconnects. This uses idempotent session and round IDs.
-- Offline play works for games that don't need STT. Speech games say so clearly when the device is offline.
+- vite-plugin-pwa (Workbox): manifest, icons (placeholders for now) and iOS tags. Precache the app shell and every route chunk, so the app opens offline.
+- **Changed when the phase was built:** no answer queue, and no caching of `/api` responses or audio. This protects privacy on shared devices, and scoring stays on the server.
+  - Games can't start offline.
+  - A game that loses its connection pauses, then picks the session up again from the server when the connection is back.
+  - Adult pages refetch by themselves when back online.
+- New versions wait for "Refresh", which never interrupts a game. Caches are cleaned on sign-out. Details are in `frontend/README.md`.
 
 ### Phase 9: Testing and deployment
 - **Backend:** pytest + httpx tests for every policy. Examples:
@@ -292,7 +295,7 @@ Commit after each phase on a feature branch, then open a PR to `main`.
 - `pnpm typecheck && pnpm test && pnpm build` in `frontend/`; Playwright end-to-end tests against the local stack.
 - Manual walkthrough as each role:
   - parent: sign up and verify email;
-  - child: play Sound Detective offline, then go back online and check that the answers sync;
+  - child: start Sound Detective, go offline mid-round (the game pauses), go back online and finish it;
   - therapist: view the report only after the parent grants access;
   - admin: approve a therapist.
 - Security checks:
