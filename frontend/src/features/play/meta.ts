@@ -18,38 +18,6 @@ export function gameLook(game: Pick<Game, 'slug' | 'icon'>): Look {
   return GAMES[game.slug] ?? { emoji: ICONS[game.icon] ?? '🎮', tile: 'bg-brand-100' };
 }
 
-const SOUNDS: Record<string, string> = {
-  dog: '🐶',
-  cat: '🐱',
-  cow: '🐮',
-  duck: '🦆',
-  lion: '🦁',
-  frog: '🐸',
-  bird: '🐦',
-  car_horn: '🚗',
-  train: '🚆',
-  airplane: '✈️',
-  bicycle_bell: '🚲',
-  ambulance: '🚑',
-  doorbell: '🚪',
-  phone: '📱',
-  clock: '⏰',
-  vacuum: '🧹',
-  tap: '🚰',
-  rain: '🌧️',
-  thunder: '⛈️',
-  wind: '💨',
-  drum: '🥁',
-  piano: '🎹',
-  guitar: '🎸',
-  bell: '🔔',
-};
-
-/** A picture for a Sound Detective option (by sound id); none for word options. */
-export function soundEmoji(id: string): string | undefined {
-  return SOUNDS[id];
-}
-
 /** How a round is answered, from its prompt: tap one, tap several in order, or speak. */
 export type AnswerKind = 'choice' | 'sequence' | 'speech';
 

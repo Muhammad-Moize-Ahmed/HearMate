@@ -50,6 +50,9 @@ def _if_used(description: str | None = None) -> Any:
 class OptionOut(BaseModel):
     id: str
     label: str
+    emoji: str | None = _if_used(
+        "A picture to show with the label. Within a round every option has one or none does"
+    )
 
 
 class StimulusOut(BaseModel):

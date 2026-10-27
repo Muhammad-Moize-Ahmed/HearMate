@@ -2133,6 +2133,18 @@
       },
       "OptionOut": {
         "properties": {
+          "emoji": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A picture to show with the label. Within a round every option has one or none does",
+            "title": "Emoji"
+          },
           "id": {
             "title": "Id",
             "type": "string"

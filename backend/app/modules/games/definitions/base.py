@@ -4,7 +4,8 @@ Round prompts all have the same outer shape so the player UI can be generic:
 
     {"instruction": str,
      "stimulus": {"type": "sound" | "speech" | "speech_sequence", "audio_url": str},
-     "options": [{"id": ..., "label": ...}],        # empty for speech games
+     "options": [{"id": ..., "label": ..., "emoji"?}],  # empty for speech games; emoji added
+                                                    # by the service for all options or none
      "noise": {"kind", "snr_db"} | None,            # already mixed into the audio
      "display_text": str | None}                    # text shown on screen (speech practice)
 
@@ -22,7 +23,7 @@ from pydantic import Field, StringConstraints
 
 from ....core.schemas import InputModel
 from ....db.models import SkillCategory
-from ..content import ContentBank
+from ..content import ContentBank, OptionKind
 from ..levels import tier_for_level
 from ..noise import TIER_SNR_DB, NoiseKind
 
@@ -76,6 +77,8 @@ class GameDefinition(ABC):
     requires_microphone: ClassVar[bool] = False
     supports_noise: ClassVar[bool] = False  # may be played "with noise" on request
     always_noise: ClassVar[bool] = False  # noise is the point of the game
+    # Where option pictures come from (games never add them; see games/pictures.py).
+    option_kind: ClassVar[OptionKind] = "words"
 
     @abstractmethod
     def build_rounds(self, ctx: RoundContext) -> list[RoundSpec]: ...

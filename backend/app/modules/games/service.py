@@ -40,6 +40,7 @@ from .content import ContentBank, load_bank
 from .definitions import REGISTRY, GameDefinition, RoundContext
 from .definitions.base import SpeechAnswer
 from .levels import MIN_LEVEL, tier_for_level
+from .pictures import with_pictures
 from .schemas import (
     AnswerIn,
     AnswerOut,
@@ -184,6 +185,7 @@ class GameSessionService:
             RoundContext(level=level, rng=rng, bank=self.bank, with_noise=session.with_noise)
         )
         session.total_rounds = len(specs)
+        pictures = self.bank.pictures_for(definition.option_kind)
         session.noise_snr_db = specs[0].noise_snr_db if specs else None
         self.db.add(session)
         self.db.flush()
@@ -191,13 +193,15 @@ class GameSessionService:
             SessionRound(
                 session_id=session.id,
                 round_index=index,
-                # The client gets a URL to the audio, never the word or sound itself.
+                # The client gets a URL to the audio, never the word or sound itself. Pictures
+                # go on every option or on none (games/pictures.py).
                 prompt=spec.prompt
                 | {
+                    "options": with_pictures(spec.prompt["options"], pictures),
                     "stimulus": {
                         "type": spec.stimulus["type"],
                         "audio_url": self._stimulus_url(session.id, index),
-                    }
+                    },
                 },
                 stimulus=spec.stimulus,
                 expected_answer=spec.expected,

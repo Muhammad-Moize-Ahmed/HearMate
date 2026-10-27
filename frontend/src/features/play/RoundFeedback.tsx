@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/Button';
 import type { AnswerResult, Prompt } from './api';
 import type { AnswerKind } from './meta';
-import { soundEmoji, soundLetters } from './meta';
+import { soundLetters } from './meta';
 
 /** After each answer: right or not, and what it was. Kind and short, then "Next". */
 export function RoundFeedback({
@@ -19,7 +19,9 @@ export function RoundFeedback({
 }) {
   const next = useRef<HTMLButtonElement>(null);
   useEffect(() => next.current?.focus(), []);
-  const labelOf = (id: string) => prompt.options.find((o) => o.id === id)?.label ?? id;
+  const optionOf = (id: string) => prompt.options.find((o) => o.id === id);
+  const labelOf = (id: string) => optionOf(id)?.label ?? id;
+  const emojiOf = (id: string) => optionOf(id)?.emoji;
   const { correct_answer: correct, feedback } = result;
 
   return (
@@ -38,9 +40,7 @@ export function RoundFeedback({
         <p className="text-xl">
           It was{' '}
           <strong>
-            {soundEmoji(correct.choice) && (
-              <span aria-hidden="true">{soundEmoji(correct.choice)} </span>
-            )}
+            {emojiOf(correct.choice) && <span aria-hidden="true">{emojiOf(correct.choice)} </span>}
             {labelOf(correct.choice)}
           </strong>
         </p>

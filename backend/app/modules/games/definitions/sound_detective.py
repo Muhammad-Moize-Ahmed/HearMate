@@ -28,6 +28,7 @@ class SoundDetective(GameDefinition):
     sort_order = 10
     answer_model = ChoiceAnswer
     supports_noise = True
+    option_kind = "sounds"
 
     def build_rounds(self, ctx: RoundContext) -> list[RoundSpec]:
         sounds = ctx.bank.sounds

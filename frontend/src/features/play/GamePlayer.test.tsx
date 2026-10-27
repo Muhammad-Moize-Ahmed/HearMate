@@ -261,9 +261,15 @@ describe('Game player: the shared shell', () => {
 });
 
 describe('Sound Detective', () => {
-  it('shows a picture for each sound and says what it was after a wrong answer', async () => {
+  it('shows the picture the server sends for each sound, and says what it was', async () => {
+    const pictured = prompt({
+      options: [
+        { id: 'dog', label: 'Dog barking', emoji: '🐶' },
+        { id: 'cat', label: 'Cat meowing', emoji: '🐱' },
+      ],
+    });
     mockChildApi({
-      'POST /api/sessions': { status: 201, body: session('sound-detective', [prompt()]) },
+      'POST /api/sessions': { status: 201, body: session('sound-detective', [pictured]) },
       [`POST ${SESSION}/rounds/0/answer`]: {
         body: answerOut({ is_correct: false, score: 0, correct_answer: { choice: 'dog' } }),
       },
@@ -277,6 +283,79 @@ describe('Sound Detective', () => {
 
     expect(await screen.findByText('Nice try!')).toBeInTheDocument();
     expect(screen.getByText(/It was/)).toHaveTextContent('It was 🐶 Dog barking');
+  });
+});
+
+describe('Pictures on word options', () => {
+  const pair = (options: { id: string; label: string; emoji?: string }[]) =>
+    prompt({
+      instruction: 'Which word did you hear?',
+      stimulus: { type: 'speech', audio_url: `${SESSION}/rounds/0/stimulus` },
+      options,
+    });
+
+  it('shows every picture when the server sends them', async () => {
+    mockChildApi({
+      'POST /api/sessions': {
+        status: 201,
+        body: session('similar-sounds', [
+          pair([
+            { id: 'cat', label: 'cat', emoji: '🐱' },
+            { id: 'hat', label: 'hat', emoji: '🎩' },
+          ]),
+        ]),
+      },
+    });
+    const { user } = renderApp('/play/games/similar-sounds');
+
+    await startGame(user);
+
+    expect(await screen.findByRole('button', { name: /cat/ })).toHaveTextContent('🐱cat');
+    expect(screen.getByRole('button', { name: /hat/ })).toHaveTextContent('🎩hat');
+  });
+
+  it('shows no picture when the server sends none, even for a word that is also a sound', async () => {
+    mockChildApi({
+      'POST /api/sessions': {
+        status: 201,
+        body: session('similar-sounds', [
+          pair([
+            { id: 'cat', label: 'cat' },
+            { id: 'hat', label: 'hat' },
+          ]),
+        ]),
+      },
+    });
+    const { user } = renderApp('/play/games/similar-sounds');
+
+    await startGame(user);
+
+    // "cat" is also a Sound Detective id; it used to get 🐱 while "hat" got nothing.
+    expect(await screen.findByRole('button', { name: 'cat' })).toHaveTextContent(/^cat$/);
+    expect(screen.getByRole('button', { name: 'hat' })).toHaveTextContent(/^hat$/);
+  });
+
+  it('shows Word Sequence pictures on the buttons and in the chosen slots', async () => {
+    const words = prompt({
+      instruction: 'Tap the words in the order you heard them.',
+      stimulus: { type: 'speech_sequence', audio_url: `${SESSION}/rounds/0/stimulus` },
+      options: [
+        { id: 'sun', label: 'sun', emoji: '☀️' },
+        { id: 'tree', label: 'tree', emoji: '🌳' },
+      ],
+      answer_length: 2,
+    });
+    mockChildApi({
+      'POST /api/sessions': { status: 201, body: session('word-sequence', [words]) },
+    });
+    const { user } = renderApp('/play/games/word-sequence');
+
+    await startGame(user);
+    await user.click(await screen.findByRole('button', { name: /tree/ }));
+
+    expect(screen.getByRole('button', { name: /sun/ })).toHaveTextContent('☀️sun');
+    const slots = screen.getByRole('list', { name: 'Your order' });
+    expect(within(slots).getAllByRole('listitem')[0]).toHaveTextContent('🌳tree');
   });
 });
 

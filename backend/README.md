@@ -67,6 +67,7 @@ app/
       adaptive.py    level rules (DifficultyStrategy); levels.py, scoring.py, noise.py, catalogue.py
       pronunciation.py  word- and phoneme-level scoring (CMU dictionary)
       sounds.py      Sound Detective files: any format via ffmpeg, trimmed, cached in memory
+      pictures.py    with_pictures(): every option in a round gets its picture, or none does
       stimulus.py    renders a round's audio: TTS / sound file + background noise
 alembic/             migrations; versions/ starts from a single baseline
 tests/               unit tests; tests/db/ needs PostgreSQL
@@ -235,6 +236,17 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
   don't affect levels.
 - **Adding a game:** write a `GameDefinition` in `definitions/`, add it to `REGISTRY`, then run
   `python -m app.cli sync-games`.
+- **Pictures on options:** a picture on only some options is a visual hint, so within a round every option shows
+  one or none does. `games/pictures.py` (`with_pictures`) is the only place this happens: the session service runs it
+  on every round's options, for every game, before the round is stored. The pictures live in the bank:
+  - Sound Detective uses each sound's `emoji`;
+  - the word games (Similar Sounds, Listening in Noise, Word Sequence) use the `pictures` map, keyed by the word.
+
+  A round shows no pictures if any option has none, or if two options share one. `emoji` is left out of the JSON
+  when there is none. Only emoji from before 2020 are used (older tablets show newer ones as an empty box);
+  `tests/test_pictures.py` fails if a newer one is added. A word in the bank without a clear picture has none, and
+  pictures for words the bank doesn't have are refused when the bank loads. Rounds stored before bank version 2
+  have no pictures.
 - **Content:** edit `content/bank.json` (validated on load; bump `version`). Rounds store the exact item
   they used, so bank edits never change past sessions.
 - **Stimulus audio is rendered on the server.** Each prompt has `stimulus: {type, audio_url}`; the word, words

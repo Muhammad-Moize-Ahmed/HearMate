@@ -235,6 +235,7 @@ def test_round_audio_never_reveals_the_answer(
                 *stored.expected_answer.get("sequence", []),
                 *(o["id"] for o in stored.prompt.get("options", [])),
                 *(o["label"] for o in stored.prompt.get("options", [])),
+                *(o.get("emoji") for o in stored.prompt.get("options", [])),
             ]
             if v
         }

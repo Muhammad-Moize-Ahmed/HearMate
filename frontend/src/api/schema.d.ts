@@ -1840,6 +1840,11 @@ export interface components {
         };
         /** OptionOut */
         OptionOut: {
+            /**
+             * Emoji
+             * @description A picture to show with the label. Within a round every option has one or none does
+             */
+            emoji?: string | null;
             /** Id */
             id: string;
             /** Label */

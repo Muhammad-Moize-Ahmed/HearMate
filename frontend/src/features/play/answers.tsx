@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
 import type { Prompt } from './api';
-import { soundEmoji } from './meta';
 import { useRecorder, type RecorderStatus } from './useRecorder';
 
 type Option = Prompt['options'][number];
 
-/** Tap the one you heard. Sound Detective options get pictures; word games show the word. */
+/**
+ * Tap the one you heard. A picture shows only if the server sent one: within a round, every option
+ * has one or none does.
+ */
 export function ChoiceAnswer({
   options,
   disabled,
@@ -23,7 +25,7 @@ export function ChoiceAnswer({
       className={`grid w-full gap-3 ${options.length > 4 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}
     >
       {options.map((option) => {
-        const emoji = soundEmoji(option.id);
+        const { emoji } = option;
         return (
           <li key={option.id}>
             <button
@@ -61,6 +63,7 @@ export function SequenceAnswer({
   const [picked, setPicked] = useState<string[]>([]);
   const full = length !== null ? picked.length === length : picked.length > 0;
   const labelOf = (id: string) => options.find((o) => o.id === id)?.label ?? id;
+  const emojiOf = (id: string) => options.find((o) => o.id === id)?.emoji;
   const slots = length ?? Math.max(picked.length, 1);
 
   return (
@@ -73,7 +76,18 @@ export function SequenceAnswer({
               picked[i] ? 'border-brand-500 bg-white' : 'border-brand-200 text-brand-300'
             }`}
           >
-            {picked[i] ? labelOf(picked[i]) : i + 1}
+            {picked[i] ? (
+              <>
+                {emojiOf(picked[i]) && (
+                  <span className="mr-1" aria-hidden="true">
+                    {emojiOf(picked[i])}
+                  </span>
+                )}
+                {labelOf(picked[i])}
+              </>
+            ) : (
+              i + 1
+            )}
           </li>
         ))}
       </ol>
@@ -86,9 +100,14 @@ export function SequenceAnswer({
                 type="button"
                 disabled={disabled || used || full}
                 onClick={() => setPicked((p) => [...p, option.id])}
-                className="min-h-20 w-full rounded-3xl bg-white p-3 text-2xl font-black shadow-[0_6px_0_var(--color-brand-200)] transition active:translate-y-1 disabled:opacity-40"
+                className="flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-3xl bg-white p-3 text-2xl font-black shadow-[0_6px_0_var(--color-brand-200)] transition active:translate-y-1 disabled:opacity-40"
               >
-                {option.label}
+                {option.emoji && (
+                  <span className="text-4xl" aria-hidden="true">
+                    {option.emoji}
+                  </span>
+                )}
+                <span className={option.emoji ? 'text-base sm:text-lg' : ''}>{option.label}</span>
               </button>
             </li>
           );

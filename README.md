@@ -159,6 +159,8 @@ src/
   The player is a small state machine (`play/playerReducer.ts`). The URL names the session, so a reload picks it
   up again. Round audio is fetched with the token and played from a blob, and the next round's audio is fetched
   ahead of time.
+  - **Pictures:** an option shows the picture the server sends (`option.emoji`). Within a round every option has one
+    or none does (decided on the server, see the backend README), so a picture is never a hint.
   - **Speech Practice** records about 10 seconds at most and uploads the recording; the microphone is switched off
     as soon as recording stops. If microphone permission is refused, if there's no microphone, or if the browser
     can't record, the child sees a plain explanation and can choose another game. If the server has no speech
