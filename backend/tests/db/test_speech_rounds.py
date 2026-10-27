@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.db.models import Child, SessionRound, SpeechAttempt, User
 from app.modules.games.catalogue import sync_games
+from app.modules.games.sounds import MAX_CLIP_SECONDS
+from app.providers.speech import SpeechServices
 from app.providers.speech.audio import read_wav
 from tests.conftest import AuthHeaders
 from tests.factories import make_child, make_user
 from tests.fakes import FakeStt, FakeTts, tone_wav
+from tests.ffmpeg import make_sound
 
 pytestmark = pytest.mark.usefixtures("ffmpeg")  # skips locally, fails in CI
 
@@ -157,6 +160,39 @@ def test_sound_stimuli_need_installed_sound_files(
     installed = db_client.get(url, headers=headers)
     assert installed.status_code == 200
     assert read_wav(installed.content).duration_ms == 1000
+
+
+def test_every_noisy_round_plays_long_files_in_any_format(
+    db_client: TestClient,
+    db_session: Session,
+    app: FastAPI,
+    child: Child,
+    headers: dict[str, str],
+    tmp_path: Path,
+    test_settings: Settings,
+) -> None:
+    # Long recordings (over the old 20 s limit) in mixed formats, as people really collect them.
+    formats = [("wav", "pcm_s24le"), ("wav", "pcm_f32le"), ("mp3", "libmp3lame"), ("m4a", "aac")]
+    response = db_client.post(
+        SESSIONS,
+        json={"child_id": str(child.id), "game": "sound-detective", "with_noise": True},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    session = response.json()
+    for index in range(len(session["rounds"])):
+        sound_id = stored_round(db_session, session["id"], index).stimulus["sound_id"]
+        extension, codec = formats[index % len(formats)]
+        make_sound(tmp_path / f"{sound_id}.{extension}", codec, seconds=25, rate=48_000, channels=2)
+    (tmp_path / ".DS_Store").write_bytes(bytes(64))
+    app.state.settings = test_settings.model_copy(update={"SOUNDS_DIR": tmp_path})
+
+    for shown in session["rounds"]:
+        assert shown["prompt"]["noise"] is not None
+        audio = db_client.get(shown["prompt"]["stimulus"]["audio_url"], headers=headers)
+        assert audio.status_code == 200, audio.text
+        # Cut to the clip length, plus the noise before and after.
+        assert read_wav(audio.content).duration_ms == MAX_CLIP_SECONDS * 1000 + 800
 
 
 def _riff_chunks(wav: bytes) -> list[bytes]:
@@ -351,6 +387,27 @@ def test_oversized_uploads_are_refused_before_processing(
 
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "audio_too_large"
+    assert fake_stt.calls == 0
+
+
+def test_recordings_over_the_time_limit_are_still_rejected(
+    db_client: TestClient,
+    child: Child,
+    headers: dict[str, str],
+    fake_stt: FakeStt,
+    speech: SpeechServices,
+) -> None:
+    # Library sounds are trimmed instead; a child's recording keeps its limit and its message.
+    session = start(db_client, headers, child, "speech-practice")
+
+    response = upload(
+        db_client, headers, session["id"], audio=tone_wav(seconds=speech.max_seconds + 1)
+    )
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "audio_too_long"
+    assert error["message"] == f"Recordings can be at most {speech.max_seconds:g} seconds"
     assert fake_stt.calls == 0
 
 

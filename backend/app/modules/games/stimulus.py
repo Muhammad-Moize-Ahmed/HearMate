@@ -7,12 +7,11 @@ from typing import Any
 
 from ...core.errors import AppError
 from ...providers.speech import AudioClip, SpeechServices
-from ...providers.speech.audio import concat, decode, mix_with_noise, to_wav
+from ...providers.speech.audio import concat, mix_with_noise, to_wav
 from .noise import NoiseKind, noise_samples
+from .sounds import sound_library
 
 SEQUENCE_GAP_MS = 700
-SOUND_EXTENSIONS = (".wav", ".mp3", ".ogg")
-MAX_SOUND_SECONDS = 20.0
 
 
 class SoundUnavailableError(AppError):
@@ -42,9 +41,11 @@ def render_stimulus(
 
 
 def _sound(sound_id: str, sounds_dir: Path | None) -> AudioClip:
-    if sounds_dir is not None:
-        for extension in SOUND_EXTENSIONS:
-            path = sounds_dir.expanduser() / f"{sound_id}{extension}"
-            if path.is_file():
-                return decode(path.read_bytes(), max_seconds=MAX_SOUND_SECONDS)
-    raise SoundUnavailableError("This sound isn't installed yet (see SOUNDS_DIR)")
+    clip = sound_library(sounds_dir).clip(sound_id) if sounds_dir is not None else None
+    if clip is not None:
+        return clip
+    # Also for a file that can't be decoded (logged when it was tried): the round says the sound
+    # isn't ready instead of failing. Never for a long file: those are trimmed.
+    raise SoundUnavailableError(
+        "This sound isn't available yet (see SOUNDS_DIR; `python -m app.cli check-sounds`)"
+    )

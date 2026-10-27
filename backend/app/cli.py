@@ -2,6 +2,7 @@
 
 uv run python -m app.cli create-admin --email admin@example.com
 uv run python -m app.cli sync-games
+uv run python -m app.cli check-sounds
 uv run python -m app.cli export-openapi --output ../frontend/src/api/openapi.json
 """
 
@@ -21,7 +22,9 @@ from .db.session import get_sessionmaker
 from .main import create_app
 from .modules.auth.schemas import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from .modules.games.catalogue import sync_games
+from .modules.games.content import load_bank
 from .modules.games.pronunciation import score_pronunciation
+from .modules.games.sounds import MAX_CLIP_SECONDS, SoundLibrary
 from .providers.speech import build_speech_services
 from .providers.speech.audio import to_wav
 from .providers.speech.piper_tts import PiperTts
@@ -96,6 +99,44 @@ def speech_setup_command() -> int:
     return 0
 
 
+def check_sounds_command(directory: Path | None) -> int:
+    """List every bank sound: the file used, the decoded clip and any problem. Read-only."""
+    directory = directory or get_settings().SOUNDS_DIR
+    if directory is None:
+        print("SOUNDS_DIR is not set (put it in .env, or pass --dir).")
+        return 1
+    directory = directory.expanduser()
+    if not directory.is_dir():
+        print(f"{directory} is not a folder.")
+        return 1
+
+    library = SoundLibrary(directory)  # its own cache, so every file is decoded afresh
+    ids = [s.id for s in load_bank().sounds]
+    library.preload(ids)
+    print(f"Sounds in {directory} (clips: leading silence skipped, at most {MAX_CLIP_SECONDS:g} s)")
+    print(f"{'sound':<14}{'file':<22}{'clip':>7}  notes")
+    ready = 0
+    for sound_id in ids:
+        check = library.check(sound_id)
+        notes = [f"{p.name}: {problem}" for p, problem in check.problems]
+        if check.used is None:
+            notes.insert(0, "NOT PLAYABLE" if check.files else "MISSING: no file")
+        else:
+            ready += 1
+            if check.cut:
+                notes.insert(0, "trimmed")
+            later = check.files[check.files.index(check.used) + 1 :]
+            notes += [f"{p.name} not used (another format wins)" for p in later]
+        clip = f"{check.duration_ms / 1000:.2f}s" if check.duration_ms is not None else "-"
+        name = check.used.name if check.used else ""
+        print(f"{sound_id:<14}{name:<22}{clip:>7}  {'; '.join(notes)}".rstrip())
+
+    for path in library.unused_files(ids):
+        print(f"Not a sound id, never played: {path.name}")
+    print(f"{ready}/{len(ids)} sounds ready.")
+    return 0 if ready == len(ids) else 1
+
+
 def export_openapi(output: Path | None) -> int:
     """Write the API schema (for the frontend's generated types) without starting a server."""
     document = json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n"
@@ -123,6 +164,11 @@ def main(argv: list[str] | None = None) -> int:
         "speech-setup", help="Download speech models (outside the repo) and self-test them"
     )
 
+    check_sounds = commands.add_parser(
+        "check-sounds", help="Check the Sound Detective files in SOUNDS_DIR (read-only)"
+    )
+    check_sounds.add_argument("--dir", type=Path, help="Folder to check instead of SOUNDS_DIR")
+
     openapi = commands.add_parser(
         "export-openapi", help="Write the OpenAPI schema as JSON (stdout by default)"
     )
@@ -135,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         return sync_games_command()
     if args.command == "speech-setup":
         return speech_setup_command()
+    if args.command == "check-sounds":
+        return check_sounds_command(args.dir)
     if args.command == "export-openapi":
         return export_openapi(args.output)
     return 2

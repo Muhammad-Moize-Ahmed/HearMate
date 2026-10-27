@@ -1,3 +1,7 @@
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,6 +21,7 @@ from .modules.games.router import (
     sessions_router,
     speech_router,
 )
+from .modules.games.sounds import preload_bank_sounds
 from .modules.goals.router import router as goals_router
 from .modules.health.router import router as health_router
 from .modules.learning_plans.router import router as learning_plans_router
@@ -30,8 +35,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.LOG_LEVEL, settings.log_format)
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if settings.SOUNDS_DIR is not None:  # decode the sound files once, before any round
+            await asyncio.to_thread(preload_bank_sounds, settings.SOUNDS_DIR)
+        yield
+
     prefix = settings.API_PREFIX
     app = FastAPI(
+        lifespan=lifespan,
         title="HearMate API",
         version="0.1.0",
         openapi_url=f"{prefix}/openapi.json",

@@ -17,33 +17,38 @@ import { childLoginSchema, loginSchema } from './schemas';
 import { panelId, tabId, type LoginTab } from './loginTabs';
 import { RoleTabs } from './RoleTabs';
 
-const HEADINGS: Record<LoginTab, { title: string; subtitle: string; emoji: string }> = {
+type Audience = 'parent' | 'therapist' | 'child';
+
+// The parent and therapist wordings head the same form: neither checks or reveals a role.
+const HEADINGS: Record<Audience, { title: string; subtitle: string; emoji: string }> = {
   parent: {
     title: 'Welcome back',
-    subtitle: 'Sign in to follow your child’s practice.',
+    subtitle: 'Parents and therapists sign in here.',
     emoji: '👋',
   },
-  child: { title: "Let's play!", subtitle: 'Type your name and your secret PIN.', emoji: '🎧' },
   therapist: {
-    title: 'Therapist sign in',
+    title: 'Welcome back',
     subtitle: 'Sign in to see the children you work with.',
     emoji: '🩺',
   },
+  child: { title: "Let's play!", subtitle: 'Type your name and your secret PIN.', emoji: '🎧' },
 };
 
-function parseTab(value: string | null): LoginTab {
+function parseAudience(value: string | null): Audience {
   return value === 'child' || value === 'therapist' ? value : 'parent';
 }
 
 export function LoginPage() {
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const tab = parseTab(params.get('as'));
-  const heading = HEADINGS[tab];
+  const audience = parseAudience(params.get('as'));
+  const tab: LoginTab = audience === 'child' ? 'child' : 'adult';
+  const heading = HEADINGS[audience];
 
   const selectTab = (next: LoginTab) => {
+    if (next === tab) return; // keeps ?as=therapist when its tab is chosen again
     const search = new URLSearchParams(params);
-    if (next === 'parent') search.delete('as');
+    if (next === 'adult') search.delete('as');
     else search.set('as', next);
     // Keep router state (where to go after signing in); don't add a history entry per tab.
     setParams(search, { replace: true, state: location.state });
@@ -53,7 +58,7 @@ export function LoginPage() {
     <AuthCard title={heading.title} subtitle={heading.subtitle} emoji={heading.emoji}>
       <RoleTabs value={tab} onChange={selectTab} />
       <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
-        {tab === 'child' ? <ChildLoginForm /> : <EmailLoginForm key={tab} audience={tab} />}
+        {audience === 'child' ? <ChildLoginForm /> : <EmailLoginForm audience={audience} />}
       </div>
     </AuthCard>
   );
@@ -70,6 +75,7 @@ function SessionNotices({ state }: { state: AuthLocationState }) {
   return null;
 }
 
+/** Parents and therapists alike: the account's role decides which dashboard opens. */
 function EmailLoginForm({ audience }: { audience: 'parent' | 'therapist' }) {
   const { signIn } = useAuth();
   const location = useLocation();

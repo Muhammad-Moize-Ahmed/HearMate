@@ -33,7 +33,7 @@ export function RoleTabs({
       role="tablist"
       aria-label="Who is signing in?"
       onKeyDown={onKeyDown}
-      className="mb-6 grid grid-cols-3 gap-1.5 rounded-3xl bg-brand-100 p-1.5"
+      className="mb-6 grid grid-cols-2 gap-1.5 rounded-3xl bg-brand-100 p-1.5"
     >
       {LOGIN_TABS.map((tab) => {
         const selected = tab.id === value;

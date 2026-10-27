@@ -11,6 +11,7 @@ uv run pytest -m "not db"                 # only tests that don't need PostgreSQ
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python -m app.cli create-admin --email you@example.com   # prompts for a password
 uv run python -m app.cli sync-games       # create/update the games table from the code registry
+uv run python -m app.cli check-sounds     # Sound Detective files in SOUNDS_DIR: what each sound plays (read-only)
 uv run python -m app.cli speech-setup     # download speech models (outside the repo) + self-test
 uv run python -m app.cli export-openapi --output ../frontend/src/api/openapi.json   # API schema (or: pnpm gen:api)
 HEARMATE_SPEECH_MODELS=1 uv run pytest tests/test_speech_models.py   # real-model round trips
@@ -23,7 +24,7 @@ ffmpeg must be on `PATH` (`brew install ffmpeg` / `apt-get install ffmpeg`).
 ```
 app/
   main.py            app factory: middleware, error handlers, routers, app.state
-  cli.py             operator commands (create-admin, sync-games, speech-setup, export-openapi)
+  cli.py             operator commands (create-admin, sync-games, check-sounds, speech-setup, export-openapi)
   core/
     config.py        settings from env / .env (pydantic-settings); production safety checks
     logging.py       JSON or console logs, each line tagged with the request ID
@@ -63,6 +64,7 @@ app/
       content/       bank.json: the curated, versioned word / minimal-pair / sentence / sound bank
       adaptive.py    level rules (DifficultyStrategy); levels.py, scoring.py, noise.py, catalogue.py
       pronunciation.py  word- and phoneme-level scoring (CMU dictionary)
+      sounds.py      Sound Detective files: any format via ffmpeg, trimmed, cached in memory
       stimulus.py    renders a round's audio: TTS / sound file + background noise
 alembic/             migrations; versions/ starts from a single baseline
 tests/               unit tests; tests/db/ needs PostgreSQL
@@ -202,11 +204,36 @@ totals accuracy and points and moves the level. Clients never send scores (unkno
 - **Not included:** sound-effect files for Sound Detective (the other four games use the TTS voice and generated
   noise). Put licensed files (e.g. CC0) in `SOUNDS_DIR` (e.g. `SOUNDS_DIR=~/.cache/hearmate/sounds` in `.env`; a leading
   `~` is expanded in settings, as for `PIPER_VOICE_DIR` and `TTS_CACHE_DIR`),
-  named `<sound_id>.wav|.mp3|.ogg`, using the 24 ids in `content/bank.json` (`dog`, `cat`, `cow`, `duck`, `lion`,
+  named `<sound_id>.<ext>`, using the 24 ids in `content/bank.json` (`dog`, `cat`, `cow`, `duck`, `lion`,
   `frog`, `bird`, `car_horn`, `train`, `airplane`, `bicycle_bell`, `ambulance`, `doorbell`, `phone`, `clock`, `vacuum`,
-  `tap`, `rain`, `thunder`, `wind`, `drum`, `piano`, `guitar`, `bell`). Any sample rate, mono or stereo (decoded to
-  16 kHz mono), at most 20 s; 1-4 s with silence trimmed and similar loudness works best. Until a file is there,
-  its rounds return 503 `sound_unavailable`. The old app's MP3s have unknown licences, so they were not copied.
+  `tap`, `rain`, `thunder`, `wind`, `drum`, `piano`, `guitar`, `bell`). The old app's MP3s have unknown licences, so
+  they were not copied. How the files are used (`games/sounds.py`):
+  - **Formats:** `.wav` at any bit depth (8/16/24/32-bit integer, 32-bit float), `.flac`, `.aiff`, `.m4a`/AAC,
+    `.mp3` and `.ogg`; any sample rate; mono or stereo. Other extensions are ignored. Each file is decoded to the
+    game engine's format: 16 kHz, mono, 16-bit. The files themselves are never changed.
+  - **Trimming, never rejecting:** leading silence (quieter than -50 dBFS) is skipped, keeping 100 ms before the
+    sound starts, then the first **4 s** are kept (`MAX_CLIP_SECONDS`), with a 100 ms fade-out where a clip was
+    cut. Shorter files are used whole. 4 s is two or three cycles of a sound that repeats (barks, a clock's ticks,
+    a ringing phone), which is what makes it recognisable, while a round stays short for a child and quick to
+    replay; noisy rounds add 0.4 s of noise before and after. Long recordings are fine: `-t` is an ffmpeg output
+    option, so ffmpeg stops reading after 4 s of sound, and a 6-minute, 100 MB file decodes in about 35 ms, the
+    same as a short one.
+  - **Not the upload rules:** library files go through `decode_file`, children's recordings through `decode`.
+    Recordings keep their own limit (`SPEECH_MAX_SECONDS`, 15 s) and errors (422 `audio_too_long`, "Recordings can
+    be at most 15 seconds"). A library file that can't be decoded raises `AudioFileError`, which is logged for the
+    operator and never sent to a client.
+  - **Cache:** every bank sound is decoded once at startup (in parallel; about 0.25 s and 3 MB for all 24) and kept
+    in memory. A file added or replaced later is decoded on its first use.
+  - **Skipped:** hidden files (`.DS_Store`, `._dog.wav`). A file that can't be decoded is skipped with a warning
+    naming it (logged once); another file for the same sound (e.g. `dog.mp3` next to a broken `dog.wav`) is used if
+    there is one. With two files for one sound, `.wav` wins over `.flac`, `.aiff`, `.m4a`, `.mp3`, `.ogg`.
+  - A sound with no usable file makes its rounds return 503 `sound_unavailable`; the app says the sound isn't ready
+    and offers another game (the session is abandoned, so levels aren't affected). The startup log lists bank sounds
+    that have no file.
+  - **Checking a folder:** `uv run python -m app.cli check-sounds` (or `--dir <folder>`) lists every sound id with the
+    file used, the decoded clip length, whether it was trimmed, and any problem: no file, a file that can't be
+    decoded (with ffmpeg's reason), a second file that isn't used, or a file whose name matches no sound id. It
+    only reads the files. It exits with 1 unless every sound is ready.
 - **Not included:** LLM-generated extra content. The bank is the only source.
 
 ## Speech services

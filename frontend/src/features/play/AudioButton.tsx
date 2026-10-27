@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { ApiError } from '../../api/client';
 import { Spinner } from '../../components/ui/Spinner';
+import { audioProblemKind, type AudioProblemKind } from './audioProblem';
 
 type AudioButtonProps = {
   audio: Blob | undefined;
@@ -84,9 +84,22 @@ export function AudioButton({
   );
 }
 
-/** Why the sound can't play. A missing file or speech voice is a grown-up's job to fix. */
+const PROBLEM_TEXT: Record<AudioProblemKind, { title: string; hint: string }> = {
+  missing: {
+    title: "Oh no! This sound isn't ready yet.",
+    hint: 'Ask a grown-up to set up the sounds, then try another game.',
+  },
+  refused: {
+    title: "Oh no! This sound won't play.",
+    hint: 'Ask a grown-up for help, then try another game.',
+  },
+  retry: { title: "We couldn't load the sound.", hint: 'Check the internet and try again.' },
+};
+
+/** Why the sound can't play. Only a problem that asking again could fix offers "Try again". */
 function AudioProblem({ error, onRetry }: { error: Error; onRetry: () => void }) {
-  const missing = error instanceof ApiError && error.status === 503;
+  const kind = audioProblemKind(error);
+  const text = PROBLEM_TEXT[kind];
   return (
     <div
       role="alert"
@@ -95,15 +108,9 @@ function AudioProblem({ error, onRetry }: { error: Error; onRetry: () => void })
       <span className="text-5xl" aria-hidden="true">
         🙉
       </span>
-      <p className="text-lg font-bold">
-        {missing ? "Oh no! This sound isn't ready yet." : "We couldn't load the sound."}
-      </p>
-      <p className="text-ink-soft">
-        {missing
-          ? 'Ask a grown-up to set up the sounds, then try another game.'
-          : 'Check the internet and try again.'}
-      </p>
-      {!missing && (
+      <p className="text-lg font-bold">{text.title}</p>
+      <p className="text-ink-soft">{text.hint}</p>
+      {kind === 'retry' && (
         <button
           type="button"
           onClick={onRetry}

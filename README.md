@@ -119,7 +119,7 @@ src/
 | Path | Who | |
 |---|---|---|
 | `/` | anyone | landing page |
-| `/login` (`?as=child` / `?as=therapist`) | signed out | tabs: parent (email + password), child (name + PIN pad), therapist |
+| `/login` (`?as=child` / `?as=therapist`) | signed out | two tabs: "Parent or therapist" (one email + password form; the account's role picks the dashboard, `?as=therapist` only changes the wording and sign-up link) and child (name + PIN pad) |
 | `/signup` (`?role=therapist`) | signed out | parent or therapist account |
 | `/verify-email`, `/forgot-password` | signed out | 6-digit emailed codes |
 | `/parent` | parents | dashboard: each child's week (games, minutes, streak) and sign-in status |
@@ -154,7 +154,9 @@ src/
     can't record, the child sees a plain explanation and can choose another game. If the server has no speech
     recognition, the game is marked "Not ready yet".
   - **Missing audio:** if a Sound Detective file isn't installed (see the backend README, `SOUNDS_DIR`), the round
-    says so and lets the child pick another game; the session is abandoned, so levels aren't affected.
+    says so and lets the child pick another game; the session is abandoned, so levels aren't affected. Any other
+    4xx for a round's audio is handled the same way, with no "Try again" (asking again can't help). Only a request
+    that got no answer (or a passing server error) says "Check the internet" and offers "Try again".
   - Children never request therapist notes or learning plans (the backend refuses them to children too).
 - **Care team:** on a child's page the parent invites a therapist by email, sees "Invited" or "Has access", and can
   cancel an invitation or remove access (with a confirmation). The same page shows the child's learning plans and

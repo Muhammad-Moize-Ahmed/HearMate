@@ -150,6 +150,69 @@ describe('Game player: the shared shell', () => {
     expect(api.callsTo(`POST ${SESSION}/abandon`)).toHaveLength(1);
   });
 
+  it.each([
+    [400, 'bad_request'],
+    [404, 'not_found'],
+    [422, 'invalid_audio'],
+  ])(
+    'treats a %i for the sound like a missing sound: no retry, another game',
+    async (status, code) => {
+      const api = mockChildApi({
+        'POST /api/sessions': { status: 201, body: session('sound-detective', [prompt()]) },
+        [`GET ${SESSION}/rounds/0/stimulus`]: { status, body: errorBody(code) },
+      });
+      const { user, router } = renderApp('/play/games/sound-detective');
+
+      await startGame(user);
+
+      expect(await screen.findByText("Oh no! This sound won't play.")).toBeInTheDocument();
+      expect(
+        screen.getByText('Ask a grown-up for help, then try another game.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Check the internet/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Dog barking/ })).not.toBeInTheDocument();
+      expect(api.callsTo(`GET ${SESSION}/rounds/0/stimulus`)).toHaveLength(1); // not retried
+      await user.click(screen.getByRole('button', { name: 'Choose another game' }));
+      expect(await screen.findByRole('heading', { name: 'Hi Ali!' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/play');
+      expect(api.callsTo(`POST ${SESSION}/abandon`)).toHaveLength(1);
+    },
+  );
+
+  it(
+    'offers "Try again" when the sound could not be fetched at all',
+    { timeout: 10_000 },
+    async () => {
+      let online = false;
+      const api = mockChildApi({
+        'POST /api/sessions': { status: 201, body: session('sound-detective', [prompt()]) },
+        [`GET ${SESSION}/rounds/0/stimulus`]: () => {
+          if (!online) throw new TypeError('Failed to fetch');
+          return { body: 'RIFF' };
+        },
+      });
+      const { user } = renderApp('/play/games/sound-detective');
+
+      await startGame(user);
+
+      // After the automatic retries for a network blip.
+      expect(
+        await screen.findByText("We couldn't load the sound.", {}, { timeout: 5000 }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Check the internet and try again.')).toBeInTheDocument();
+      const failedCalls = api.callsTo(`GET ${SESSION}/rounds/0/stimulus`).length;
+      expect(failedCalls).toBeGreaterThan(1);
+
+      online = true;
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByRole('button', { name: /Dog barking/ })).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(api.callsTo(`GET ${SESSION}/rounds/0/stimulus`)).toHaveLength(failedCalls + 1);
+    },
+  );
+
   it('keeps the round when an answer fails to send, so it can be tried again', async () => {
     let attempts = 0;
     mockChildApi({

@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     PIPER_VOICE: str = "en_US-lessac-medium"
     PIPER_VOICE_DIR: Path = USER_CACHE_DIR / "piper"
     TTS_CACHE_DIR: Path = USER_CACHE_DIR / "tts"
-    # Licensed sound-effect files named <sound_id>.wav|.mp3|.ogg (none ship with the repo).
+    # Licensed sound-effect files, <sound_id>.<ext> in any format ffmpeg reads (none in the repo).
     SOUNDS_DIR: Path | None = None
     AZURE_SPEECH_KEY: SecretStr | None = None
     AZURE_SPEECH_REGION: str | None = None

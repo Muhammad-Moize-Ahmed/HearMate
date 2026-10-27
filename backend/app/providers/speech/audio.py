@@ -7,6 +7,7 @@ import wave
 from collections.abc import Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -30,6 +31,11 @@ class InvalidAudioError(AppError):
 class SpeechUnavailableError(AppError):
     status_code = HTTPStatus.SERVICE_UNAVAILABLE
     code = "speech_unavailable"
+
+
+class AudioFileError(Exception):
+    """A local file (e.g. in SOUNDS_DIR) that ffmpeg can't turn into audio. Deliberately not an
+    AppError: it is reported to the operator, never sent to a client like an upload error."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +95,66 @@ def decode(data: bytes, *, max_seconds: float) -> AudioClip:
             f"Recordings can be at most {max_seconds:g} seconds", code="audio_too_long"
         )
     return clip
+
+
+def decode_file(path: Path, *, max_seconds: float, silence_db: float = -50.0) -> AudioClip:
+    """Any file ffmpeg can decode -> 16 kHz mono 16-bit, without its leading silence (anything
+    quieter than `silence_db`, keeping 100 ms before the sound starts), cut to `max_seconds`.
+
+    For trusted local files (SOUNDS_DIR); uploads go through `decode`, which rejects long audio
+    instead. `-t` is an output option, so ffmpeg stops reading once it has `max_seconds` of
+    output: a 6-minute file costs no more than a short one. Raises AudioFileError.
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise SpeechUnavailableError("Audio processing is not available (ffmpeg not installed)")
+    command = [
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        # Local files only: a playlist can't make ffmpeg fetch URLs.
+        "-protocol_whitelist",
+        "file",
+        "-i",
+        f"file:{path}",
+        "-vn",
+        "-af",
+        "silenceremove=start_periods=1:start_silence=0.1:detection=peak"
+        f":start_threshold={silence_db:g}dB",
+        "-t",
+        f"{max_seconds:g}",
+        "-ac",
+        "1",
+        "-ar",
+        str(SAMPLE_RATE),
+        "-f",
+        "s16le",
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed argument list, no shell
+            command, capture_output=True, timeout=FFMPEG_TIMEOUT_SECONDS, check=False
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise AudioFileError(f"ffmpeg took over {FFMPEG_TIMEOUT_SECONDS} s") from exc
+    if result.returncode != 0:
+        errors = result.stderr.decode(errors="replace").strip().splitlines()
+        raise AudioFileError(errors[-1] if errors else f"ffmpeg exited {result.returncode}")
+
+    samples = np.frombuffer(result.stdout, dtype="<i2").astype(np.float32) / 32768.0
+    if len(samples) == 0:
+        raise AudioFileError("no audio (empty, or silent throughout)")
+    return AudioClip(samples)
+
+
+def fade_out(clip: AudioClip, ms: int) -> AudioClip:
+    """Ramp the last `ms` down to silence, so a clip cut mid-sound doesn't end in a click."""
+    n = min(len(clip.samples), SAMPLE_RATE * ms // 1000)
+    samples = clip.samples.copy()
+    samples[len(samples) - n :] *= np.linspace(1.0, 0.0, n, dtype=np.float32)
+    return AudioClip(samples)
 
 
 def read_wav(data: bytes) -> AudioClip:

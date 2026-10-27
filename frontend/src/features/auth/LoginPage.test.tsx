@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 
-import { CHILD, errorBody, mockApi, PARENT, tokenFor } from '../../test/mockApi';
+import { CHILD, errorBody, mockApi, PARENT, THERAPIST, tokenFor } from '../../test/mockApi';
 import { renderApp } from '../../test/renderApp';
 
 async function signIn(user: ReturnType<typeof renderApp>['user'], email: string, password: string) {
@@ -10,14 +10,15 @@ async function signIn(user: ReturnType<typeof renderApp>['user'], email: string,
 }
 
 describe('Login', () => {
-  it('has Parent, Child and Therapist tabs that work with the keyboard', async () => {
+  it('has a shared "Parent or therapist" tab and a Child tab that work with the keyboard', async () => {
     mockApi({});
     const { user, router } = renderApp('/login');
 
-    const parentTab = await screen.findByRole('tab', { name: /Parent/ });
-    expect(parentTab).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findAllByRole('tab')).toHaveLength(2);
+    const adultTab = screen.getByRole('tab', { name: /Parent or therapist/ });
+    expect(adultTab).toHaveAttribute('aria-selected', 'true');
 
-    parentTab.focus();
+    adultTab.focus();
     await user.keyboard('{ArrowRight}');
 
     expect(screen.getByRole('tab', { name: /Child/ })).toHaveAttribute('aria-selected', 'true');
@@ -25,8 +26,68 @@ describe('Login', () => {
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName(/Child/);
     expect(router.state.location.search).toBe('?as=child');
 
-    await user.keyboard('{ArrowRight}');
-    expect(await screen.findByRole('heading', { name: 'Therapist sign in' })).toBeInTheDocument();
+    await user.keyboard('{ArrowRight}'); // wraps around
+    expect(adultTab).toHaveAttribute('aria-selected', 'true');
+    expect(router.state.location.search).toBe('');
+  });
+
+  it('keeps /login?as=therapist: the same form, with therapist wording and sign-up link', async () => {
+    mockApi({});
+    const { user, router } = renderApp('/login?as=therapist');
+
+    expect(
+      await screen.findByText('Sign in to see the children you work with.'),
+    ).toBeInTheDocument();
+    const adultTab = screen.getByRole('tab', { name: /Parent or therapist/ });
+    expect(adultTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
+      'href',
+      '/signup?role=therapist',
+    );
+
+    await user.click(adultTab); // choosing the current tab again keeps the wording
+    expect(router.state.location.search).toBe('?as=therapist');
+  });
+
+  it('opens a parent account from the therapist wording without mentioning its role', async () => {
+    const api = mockApi({ 'POST /api/auth/login': { body: tokenFor(PARENT) } });
+    const { user, router } = renderApp('/login?as=therapist');
+
+    await signIn(user, 'sam@example.com', 'a-long-password');
+
+    expect(await screen.findByRole('heading', { name: 'Hi, Sam!' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/parent');
+    expect(screen.queryByText(/not a therapist/i)).not.toBeInTheDocument();
+    // The request is the same as from the parent wording: no role is asked for.
+    expect(api.callsTo('POST /api/auth/login')[0]?.body).toEqual({
+      email: 'sam@example.com',
+      password: 'a-long-password',
+    });
+  });
+
+  it('opens a therapist account from the plain form', async () => {
+    mockApi({ 'POST /api/auth/login': { body: tokenFor(THERAPIST) } });
+    const { user, router } = renderApp('/login');
+
+    await signIn(user, 'sara@example.com', 'a-long-password');
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/therapist'));
+  });
+
+  it('gives the same wrong-password message for either wording', async () => {
+    for (const path of ['/login', '/login?as=therapist']) {
+      mockApi({ 'POST /api/auth/login': { status: 401, body: errorBody('invalid_credentials') } });
+      const { user, unmount } = renderApp(path);
+
+      await signIn(user, 'sam@example.com', 'wrong-password');
+
+      expect(
+        await screen.findByText(
+          "That email and password don't match. Please check them and try again.",
+        ),
+      ).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it('checks the form before calling the server', async () => {
