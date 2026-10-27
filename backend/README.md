@@ -51,6 +51,8 @@ app/
   modules/
     health/          GET /api/health (liveness), GET /api/health/ready (database check)
     auth/            /api/auth/*: signup, verify-email, login, child-login, refresh, logout, password reset, me
+    account/         /api/account/*: deletion summary and account deletion; purge.py deletes a family, a child or a
+                     therapist and cleans the audit log; also serves POST /api/children/{id}/delete
     admin/           /api/admin/therapists: list, approve, reject; /api/admin/users and /stats (read-only)
     children/        /api/children: profiles (typed options in options.py) and child sign-in (username + PIN)
     goals/           /api/children/{id}/goals: parent-set targets; readable by anyone who can see the child
@@ -132,8 +134,8 @@ tests/               unit tests; tests/db/ needs PostgreSQL
 - **Child sign-in:** usernames are unique across all families (3–30 characters, starting with a letter). PINs are 4–8 digits,
   with obvious ones (1111, 1234, 9876) refused. Changing or removing the login signs the child out everywhere.
 - **Goal progress** (`current_value`) is read-only here; it will be computed from game sessions in Phase 6.
-- **Deleting a child** permanently removes their sessions, goals, links, progress, notes and learning plans
-  (database cascade).
+- **Deleting a child** needs the parent's password and permanently removes everything about them; see
+  [Deleting accounts and children](#deleting-accounts-and-children).
 
 ## Therapist notes and learning plans
 
@@ -154,7 +156,8 @@ therapists. The child can't read them (403), because notes are clinical and writ
 | `POST learning-plans/{plan_id}/archive` | linked therapist | end the active plan without starting a new one |
 
 - **Notes:** only the author can change or delete a note. When a therapist's link is removed, they lose access, but
-  their notes stay visible to the parent.
+  their notes stay visible to the parent. When a therapist deletes their account, their notes and plans stay too,
+  with `author` / `created_by` null (the app shows "Former therapist"); nobody can edit those notes any more.
 - **One active plan per child.** Any linked therapist can edit it (it is the child's shared plan; `created_by` shows
   who started it). Archived plans are kept unchanged as history: changing one gives 409 `plan_archived`. Plans are
   archived, never deleted. If two therapists start a plan at the same moment, one gets 409 `plan_changed`.
@@ -164,6 +167,48 @@ therapists. The child can't read them (403), because notes are clinical and writ
   title and category.
 - **`difficulty`** (`easy` / `medium` / `hard`) is the therapist's suggestion only. The child's level is still set by the
   adaptive engine.
+
+## Deleting accounts and children
+
+Immediate and permanent (no grace period). The password is asked for again; a wrong one is 403 `wrong_password`
+(not 401, so the app doesn't refresh and resend). It shares login's lockout (5 wrong attempts, 15 minutes), plus
+5 attempts per 15 minutes per account and 10 an hour per IP.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `GET /api/account/deletion-summary` | parent, therapist | for the warning screen: a parent's children (names), games played and therapists; a therapist's linked children, notes and plans |
+| `POST /api/account/delete` `{password}` | parent, therapist | delete the account; 204, refresh cookie cleared |
+| `POST /api/children/{id}/delete` `{password}` | the child's parent | delete one child (replaces the old `DELETE /api/children/{id}`, which now gives 405) |
+
+Admins (their own accounts included) and children get 403: admins stay read-only, and only the counts in
+`/admin/stats` change.
+
+| | Parent deletes account | Parent deletes a child | Therapist deletes account |
+|---|---|---|---|
+| Account (`users`), `refresh_tokens`, `one_time_codes` | deleted | – (that child's refresh tokens go) | deleted |
+| `children` and all their data: sessions, rounds, speech transcripts, levels, level history, goals, badges, daily activity (streaks), links and invitations, notes, plans | deleted (cascade) | deleted (cascade) | – |
+| `therapist_profiles` | – | – | deleted |
+| `therapist_child_links` (active links and pending invitations) | deleted | that child's deleted | theirs deleted |
+| `therapist_notes`, `learning_plans` they wrote | – | – | **kept**, author set to null |
+| `audit_log` | every row by or about the family deleted; one anonymous `account_deleted` event added | every row about the child deleted; `child_deleted` names only the parent | their own account events deleted; their reads and writes of a child's data **kept, with no actor and no IP**; ids of them in other events removed; one anonymous `account_deleted` event |
+
+- **The audit log is cleaned explicitly** (`account/purge.py`): it keeps ids as plain strings (`resource_id`,
+  `details`) and IP addresses, which no foreign key reaches.
+- **Sessions:** every refresh token is deleted, and `get_principal` re-checks the account on every request, so every
+  device (the children's too) is signed out at its next request.
+- **Files:** nothing on disk belongs to a user (recordings are never stored; the TTS cache holds only bank words).
+- **Emails** (after the commit, from the in-memory outbox; never stored):
+  - parent: "Your HearMate account was deleted";
+  - therapist: "Your HearMate therapist account was deleted";
+  - one child: "A child profile was deleted from your HearMate account";
+  - each parent with a live link to a deleted therapist: "A therapist left your child's care team".
+
+  They give counts, never a child's name. Only the last one names the therapist, in the body, never in the subject
+  (a failed send is logged by its subject). With `EMAIL_BACKEND=console` (development) the whole email, name
+  included, goes to the backend log, as for every email in development.
+- **Tests:** `tests/db/test_account_deletion.py` builds a family with rows in every table, deletes it, and scans every
+  row of every table as text (`tests/residue.py`): the deleted person's ids, email, names, username and IP must
+  appear nowhere, and every table's row count must be back to where it was.
 
 ## Therapy game engine
 

@@ -59,33 +59,63 @@ describe('Child page', () => {
     });
   });
 
-  it('deletes the child only after their name is typed', async () => {
-    const api = mockParentApi({ [`DELETE ${CHILD_URL}`]: { status: 204 } });
-    const { user, router } = renderApp(PAGE);
+  it('deletes the child after "I understand" and the password, then says so', async () => {
+    const api = mockParentApi({
+      [`POST ${CHILD_URL}/delete`]: ({ body }) =>
+        (body as { password: string }).password === 'a-long-password'
+          ? { status: 204 }
+          : { status: 403, body: errorBody('wrong_password') },
+    });
+    const { user, router, queryClient } = renderApp(PAGE);
 
-    await user.click(await screen.findByRole('button', { name: "Delete Ali's profile" }));
-    const dialog = screen.getByRole('alertdialog', { name: "Delete Ali's profile?" });
-    const confirm = within(dialog).getByRole('button', { name: 'Delete forever' });
-    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
-    expect(confirm).toBeDisabled();
+    await user.click(await screen.findByRole('link', { name: "Delete Ali's profile…" }));
+    expect(
+      await screen.findByRole('heading', { name: "Delete Ali's profile?" }),
+    ).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: "Delete Ali's profile forever" });
+    expect(button).toBeDisabled();
+    await user.click(screen.getByLabelText('I understand that this is permanent.'));
+    await user.type(screen.getByLabelText('Your password'), 'wrong-password');
+    await user.click(button);
 
-    await user.type(within(dialog).getByLabelText(/Type Ali to confirm/), 'Ali');
-    await user.click(confirm);
+    expect(
+      await screen.findByText("That password isn't right. Nothing has been deleted."),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`${PAGE}/delete`);
 
-    await screen.findByText(/Here's how your children are getting on/);
+    await user.clear(screen.getByLabelText('Your password'));
+    await user.type(screen.getByLabelText('Your password'), 'a-long-password');
+    await user.click(button);
+
+    expect(
+      await screen.findByText("The profile was deleted. We've emailed you to confirm."),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/parent');
-    expect(api.callsTo(`DELETE ${CHILD_URL}`)).toHaveLength(1);
+    expect(api.callsTo(`POST ${CHILD_URL}/delete`).map((c) => c.body)).toEqual([
+      { password: 'wrong-password' },
+      { password: 'a-long-password' },
+    ]);
+    // Nothing about the child is kept in memory (and they aren't fetched again), and no name is
+    // put in the history state.
+    const childData = queryClient
+      .getQueryCache()
+      .getAll()
+      .filter((q) => q.queryKey[0] === 'children' && q.queryKey[1] === CHILD_ID)
+      .filter((q) => q.state.data !== undefined);
+    expect(childData).toEqual([]);
+    expect(api.callsTo(`GET ${CHILD_URL}`)).toHaveLength(1);
+    expect(JSON.stringify(router.state.location.state)).not.toContain('Ali');
   });
 
-  it('closes the dialog with Escape without deleting', async () => {
+  it('goes back without deleting', async () => {
     const api = mockParentApi();
-    const { user } = renderApp(PAGE);
+    const { user, router } = renderApp(`${PAGE}/delete`);
 
-    await user.click(await screen.findByRole('button', { name: "Delete Ali's profile" }));
-    await user.keyboard('{Escape}');
+    await user.click(await screen.findByRole('link', { name: 'Cancel' }));
 
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(api.callsTo(`DELETE ${CHILD_URL}`)).toHaveLength(0);
+    await screen.findByRole('heading', { name: 'Ali' });
+    expect(router.state.location.pathname).toBe(PAGE);
+    expect(api.callsTo(`POST ${CHILD_URL}/delete`)).toHaveLength(0);
   });
 });
 

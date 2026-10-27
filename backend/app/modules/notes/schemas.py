@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
 from ...core.schemas import InputModel
 
@@ -24,7 +24,7 @@ class AuthorOut(BaseModel):
 class NoteOut(BaseModel):
     id: uuid.UUID
     child_id: uuid.UUID
-    author: AuthorOut
+    author: AuthorOut | None = Field(description="Null if that account was deleted")
     body: str
     created_at: datetime
     updated_at: datetime

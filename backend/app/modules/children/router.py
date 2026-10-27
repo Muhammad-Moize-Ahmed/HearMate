@@ -1,11 +1,14 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
 from ...auth.deps import CurrentPrincipal, DbSession, ParentPrincipal
 from ...auth.principal import Principal
-from ...core.deps import ClientIp
+from ...core.deps import AppSettings, ClientIp, Limiter, Mailer
+from ..account.router import limit_deletions, send_outbox
+from ..account.schemas import ConfirmPasswordIn
+from ..account.service import AccountService
 from .schemas import ChildCreateIn, ChildLoginIn, ChildOut, ChildUpdateIn
 from .service import ChildrenService, to_child_out
 
@@ -53,10 +56,27 @@ def update_child(child_id: uuid.UUID, body: ChildUpdateIn, service: ParentServic
     return to_child_out(service.update(child_id, body), service.principal)
 
 
-@router.delete("/{child_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_child(child_id: uuid.UUID, service: ParentService) -> None:
-    """Permanently deletes the child and all of their data."""
-    service.delete(child_id)
+def get_child_deletion_service(
+    db: DbSession, settings: AppSettings, principal: ParentPrincipal, ip: ClientIp
+) -> AccountService:
+    return AccountService(db, settings, principal, client_ip=ip)
+
+
+@router.post("/{child_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+def delete_child(
+    child_id: uuid.UUID,
+    body: ConfirmPasswordIn,
+    service: Annotated[AccountService, Depends(get_child_deletion_service)],
+    limiter: Limiter,
+    ip: ClientIp,
+    mailer: Mailer,
+    background: BackgroundTasks,
+) -> None:
+    """Permanently delete the child and all of their data. Needs the parent's password again
+    (a wrong one is 403 `wrong_password`); the parent is emailed afterwards."""
+    limit_deletions(limiter, service.principal, ip)
+    service.delete_child(child_id, body.password)
+    send_outbox(service, mailer, background)
 
 
 @router.put("/{child_id}/login")

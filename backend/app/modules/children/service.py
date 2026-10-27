@@ -73,13 +73,6 @@ class ChildrenService:
         self.db.refresh(child)
         return child
 
-    def delete(self, child_id: uuid.UUID) -> None:
-        """Deletes the child and, by cascade, all their sessions, goals, links and progress."""
-        child = get_editable_child(self.db, self.principal, child_id)
-        self._audit(child, "child_deleted", details={"display_name": child.display_name})
-        self.db.delete(child)
-        self.db.commit()
-
     def set_login(self, child_id: uuid.UUID, data: ChildLoginIn) -> Child:
         """Create or change the child's username and PIN. Signs the child out everywhere."""
         child = get_editable_child(self.db, self.principal, child_id)

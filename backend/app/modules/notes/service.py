@@ -28,7 +28,8 @@ class NotesService:
         child = get_plan_readable_child(self.db, self.principal, child_id)
         query = (
             select(TherapistNote, User)
-            .join(User, User.id == TherapistNote.therapist_id)
+            # Outer join: a deleted therapist's notes stay, with no author.
+            .outerjoin(User, User.id == TherapistNote.therapist_id)
             .where(TherapistNote.child_id == child.id)
         )
         if before is not None:
@@ -84,8 +85,7 @@ class NotesService:
         return note
 
     def _out(self, note: TherapistNote) -> NoteOut:
-        author = self.db.get(User, note.therapist_id)
-        assert author is not None  # noqa: S101 - the foreign key cascades on delete
+        author = self.db.get(User, note.therapist_id) if note.therapist_id else None
         return to_note_out(note, author)
 
     def _audit(self, child: Child, action: str, note: TherapistNote | None = None) -> None:
@@ -100,11 +100,13 @@ class NotesService:
         )
 
 
-def to_note_out(note: TherapistNote, author: User) -> NoteOut:
+def to_note_out(note: TherapistNote, author: User | None) -> NoteOut:
     return NoteOut(
         id=note.id,
         child_id=note.child_id,
-        author=AuthorOut(id=author.id, first_name=author.first_name, last_name=author.last_name),
+        author=AuthorOut(id=author.id, first_name=author.first_name, last_name=author.last_name)
+        if author
+        else None,
         body=note.body,
         created_at=note.created_at,
         updated_at=note.updated_at,

@@ -10,12 +10,13 @@ import { routes } from '../app/routes';
 export function renderApp(path: string, { state }: { state?: unknown } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [{ ...splitPath(path), state }] });
   const user = userEvent.setup();
+  const queryClient = createQueryClient();
   const view = render(
-    <Providers queryClient={createQueryClient()}>
+    <Providers queryClient={queryClient}>
       <RouterProvider router={router} />
     </Providers>,
   );
-  return { ...view, router, user };
+  return { ...view, router, user, queryClient };
 }
 
 function splitPath(path: string) {

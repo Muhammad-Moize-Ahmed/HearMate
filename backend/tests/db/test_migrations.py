@@ -1,8 +1,12 @@
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, delete, inspect
+from sqlalchemy.orm import Session
 
 from app.db.base import Base
+from app.db.models import TherapistNote, User
+from tests.factories import make_child, make_user
 
 
 def test_migrations_create_every_model_table(migrated_engine: Engine) -> None:
@@ -22,3 +26,24 @@ def test_downgrade_to_base_and_back_up(migrated_engine: Engine, alembic_cfg: Con
 
     command.upgrade(alembic_cfg, "head")
     assert set(Base.metadata.tables) <= set(inspect(migrated_engine).get_table_names())
+
+
+def test_downgrade_keeps_notes_by_deleted_therapists(
+    migrated_engine: Engine, alembic_cfg: Config
+) -> None:
+    # A note whose author was deleted can't exist in the old schema: the downgrade refuses
+    # instead of deleting the family's note.
+    with Session(migrated_engine) as db:  # committed for real: alembic uses its own connection
+        parent = make_user(db)
+        child = make_child(db, parent)
+        db.add(TherapistNote(therapist_id=None, child_id=child.id, body="Kept for the family."))
+        db.commit()
+        parent_id = parent.id
+    try:
+        with pytest.raises(RuntimeError, match="belong to deleted therapists"):
+            command.downgrade(alembic_cfg, "e80da29dafc2")
+        assert set(Base.metadata.tables) <= set(inspect(migrated_engine).get_table_names())
+    finally:
+        with migrated_engine.begin() as conn:
+            conn.execute(delete(User).where(User.id == parent_id))  # the child and note cascade
+        command.upgrade(alembic_cfg, "head")

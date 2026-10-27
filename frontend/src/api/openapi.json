@@ -965,6 +965,23 @@
         "title": "ChoiceAnswer",
         "type": "object"
       },
+      "ConfirmPasswordIn": {
+        "additionalProperties": false,
+        "description": "The signed-in user's password, asked again before a permanent deletion.",
+        "properties": {
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "ConfirmPasswordIn",
+        "type": "object"
+      },
       "ContrastOut": {
         "properties": {
           "accuracy": {
@@ -2068,7 +2085,15 @@
       "NoteOut": {
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/AuthorOut"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null if that account was deleted"
           },
           "body": {
             "title": "Body",
@@ -2140,6 +2165,42 @@
           "last_name"
         ],
         "title": "ParentBriefOut",
+        "type": "object"
+      },
+      "ParentDeletionSummaryOut": {
+        "description": "What deleting a parent's account removes, for the warning screen.",
+        "properties": {
+          "children": {
+            "description": "The children's display names, in name order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "games_played": {
+            "description": "Completed games across the family",
+            "title": "Games Played",
+            "type": "integer"
+          },
+          "role": {
+            "const": "parent",
+            "title": "Role",
+            "type": "string"
+          },
+          "therapists": {
+            "description": "Therapists with access to, or invited to, a child",
+            "title": "Therapists",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role",
+          "children",
+          "games_played",
+          "therapists"
+        ],
+        "title": "ParentDeletionSummaryOut",
         "type": "object"
       },
       "ParentLinkOut": {
@@ -3383,6 +3444,39 @@
         "title": "TherapistCountsOut",
         "type": "object"
       },
+      "TherapistDeletionSummaryOut": {
+        "description": "What deleting a therapist's account ends, and what stays with the children.",
+        "properties": {
+          "learning_plans": {
+            "description": "Plans they started; these stay, by a former therapist",
+            "title": "Learning Plans",
+            "type": "integer"
+          },
+          "linked_children": {
+            "description": "Children whose care team they are in or invited to",
+            "title": "Linked Children",
+            "type": "integer"
+          },
+          "notes": {
+            "description": "Notes they wrote; these stay, by a former therapist",
+            "title": "Notes",
+            "type": "integer"
+          },
+          "role": {
+            "const": "therapist",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "linked_children",
+          "notes",
+          "learning_plans"
+        ],
+        "title": "TherapistDeletionSummaryOut",
+        "type": "object"
+      },
       "TherapistDetailsIn": {
         "additionalProperties": false,
         "properties": {
@@ -3922,6 +4016,88 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account/delete": {
+      "post": {
+        "description": "Delete this account now and for good, then sign out every device.\n\nParent: the account and every child's data. Therapist: the account, links and invitations;\ntheir notes and learning plans stay with each child, by a former therapist. A wrong password\nis 403 `wrong_password`.",
+        "operationId": "delete_account_api_account_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Account",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/account/deletion-summary": {
+      "get": {
+        "description": "What deleting this account would remove (parent) or end (therapist).",
+        "operationId": "deletion_summary_api_account_deletion_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "parent": "#/components/schemas/ParentDeletionSummaryOut",
+                      "therapist": "#/components/schemas/TherapistDeletionSummaryOut"
+                    },
+                    "propertyName": "role"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ParentDeletionSummaryOut"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TherapistDeletionSummaryOut"
+                    }
+                  ],
+                  "title": "Response Deletion Summary Api Account Deletion Summary Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Deletion Summary",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/admin/stats": {
       "get": {
         "description": "Account, child and session counts for the dashboard. Counts only.",
@@ -4729,46 +4905,6 @@
       }
     },
     "/api/children/{child_id}": {
-      "delete": {
-        "description": "Permanently deletes the child and all of their data.",
-        "operationId": "delete_child_api_children__child_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "child_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Child Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Delete Child",
-        "tags": [
-          "children"
-        ]
-      },
       "get": {
         "operationId": "get_child_api_children__child_id__get",
         "parameters": [
@@ -4922,6 +5058,58 @@
         "summary": "Get Achievements",
         "tags": [
           "progress"
+        ]
+      }
+    },
+    "/api/children/{child_id}/delete": {
+      "post": {
+        "description": "Permanently delete the child and all of their data. Needs the parent's password again\n(a wrong one is 403 `wrong_password`); the parent is emailed afterwards.",
+        "operationId": "delete_child_api_children__child_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Child Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Child",
+        "tags": [
+          "children"
         ]
       }
     },

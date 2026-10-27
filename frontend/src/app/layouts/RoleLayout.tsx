@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Outlet } from 'react-router';
 
 import { useAuth, usePrincipal } from '../../auth/context';
-import { Button } from '../../components/ui/Button';
+import { Button, LinkButton } from '../../components/ui/Button';
 import { Logo } from '../../components/ui/Logo';
 import { InstallPrompt } from '../../pwa/InstallPrompt';
 
@@ -12,10 +12,12 @@ type RoleLayoutProps = {
   /** Background of the badge. */
   badgeClass: string;
   home: string;
+  /** The account page (parents and therapists); admins have none. */
+  account?: string;
 };
 
 /** The frame for adult areas (parent, therapist, admin): a header with the user and sign out. */
-export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
+export function RoleLayout({ roleLabel, badgeClass, home, account }: RoleLayoutProps) {
   const principal = usePrincipal();
   const { signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
@@ -35,6 +37,11 @@ export function RoleLayout({ roleLabel, badgeClass, home }: RoleLayoutProps) {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-ink-soft sm:inline">{name}</span>
+            {account && (
+              <LinkButton to={account} variant="ghost">
+                Account
+              </LinkButton>
+            )}
             <Button
               variant="secondary"
               loading={signingOut}

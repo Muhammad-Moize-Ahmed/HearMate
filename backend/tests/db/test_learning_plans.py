@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth.passwords import hash_secret
 from app.db.models import (
     AuditLog,
     Child,
@@ -19,6 +20,7 @@ from app.db.models import (
 )
 from tests.conftest import AuthHeaders
 from tests.factories import (
+    DEFAULT_PASSWORD,
     link_therapist,
     make_child,
     make_game,
@@ -473,8 +475,11 @@ def test_deleting_the_child_removes_their_plans(
 ) -> None:
     create_plan(db_client, child, auth_headers(therapist), plan_body(games))
 
-    assert (
-        db_client.delete(f"/api/children/{child.id}", headers=auth_headers(parent)).status_code
-        == 204
+    parent.password_hash = hash_secret(DEFAULT_PASSWORD)
+    response = db_client.post(
+        f"/api/children/{child.id}/delete",
+        json={"password": DEFAULT_PASSWORD},
+        headers=auth_headers(parent),
     )
+    assert response.status_code == 204
     assert db_session.scalars(select(LearningPlan)).all() == []

@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 import { usePrincipal } from '../../auth/context';
 import { Alert } from '../../components/ui/Alert';
@@ -16,6 +16,8 @@ export function ParentDashboard() {
   const firstName = principal.kind === 'child' ? principal.display_name : principal.first_name;
   const children = useChildren();
   const family = useFamilyProgress();
+  const location = useLocation();
+  const childDeleted = (location.state as { notice?: string } | null)?.notice === 'child-deleted';
 
   return (
     <>
@@ -24,6 +26,11 @@ export function ParentDashboard() {
         <h1 className="text-3xl font-black sm:text-4xl">Hi, {firstName}!</h1>
         <p className="text-lg text-ink-soft">Here's how your children are getting on this week.</p>
       </div>
+      {childDeleted && (
+        <div className="mb-6">
+          <Alert tone="success">The profile was deleted. We've emailed you to confirm.</Alert>
+        </div>
+      )}
 
       {children.isPending && <Loading label="Loading your children…" />}
       {children.isError && (

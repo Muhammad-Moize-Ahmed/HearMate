@@ -51,7 +51,7 @@ overwrite them). The manifest test checks that every icon exists at the size the
   all), and audio files (excluded from the precache). A shared device therefore keeps nothing about a child in the
   worker's cache, and scoring always happens on the server. Opening an `/api/...` URL directly is never answered
   with the app shell either.
-- **Sign-out** (or an expired sign-in): the in-memory query cache is cleared, and every Cache Storage entry except
+- **Sign-out** (or an expired sign-in, or a deleted account): the in-memory query cache is cleared, and every Cache Storage entry except
   Workbox's build precache is deleted ([src/pwa/caches.ts](src/pwa/caches.ts)). The access token was only ever in
   memory.
 - **Updates** ([src/pwa/updates.ts](src/pwa/updates.ts)): a new deploy installs in the background and waits. The page

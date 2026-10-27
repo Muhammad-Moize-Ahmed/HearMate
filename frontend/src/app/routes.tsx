@@ -21,6 +21,24 @@ function page<M>(load: () => Promise<M>, pick: (module: M) => ComponentType) {
 /** Shown while the first page's code loads, before anything else is on screen. */
 const hydrateFallbackElement = <FullPageSpinner />;
 
+/** The account page and its deletion screen, for parents and therapists (not admins). */
+const accountRoutes: RouteObject[] = [
+  {
+    path: 'account',
+    lazy: page(
+      () => import('../features/account/AccountPage'),
+      (m) => m.AccountPage,
+    ),
+  },
+  {
+    path: 'account/delete',
+    lazy: page(
+      () => import('../features/account/DeleteAccountPage'),
+      (m) => m.DeleteAccountPage,
+    ),
+  },
+];
+
 /**
  * Every screen. Each role's area sits behind `RequireRole`; the sign-in screens sit behind
  * `PublicOnly`, which sends a signed-in user on to their own area.
@@ -64,6 +82,14 @@ export const routes: RouteObject[] = [
           },
         ],
       },
+      {
+        // Outside PublicOnly and the role guards: shown while the deleted session ends.
+        path: 'account-deleted',
+        lazy: page(
+          () => import('../features/account/AccountDeletedPage'),
+          (m) => m.AccountDeletedPage,
+        ),
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -73,7 +99,14 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: 'parent',
-        element: <RoleLayout roleLabel="Parent" badgeClass="bg-sun-200" home="/parent" />,
+        element: (
+          <RoleLayout
+            roleLabel="Parent"
+            badgeClass="bg-sun-200"
+            home="/parent"
+            account="/parent/account"
+          />
+        ),
         children: [
           {
             index: true,
@@ -96,6 +129,14 @@ export const routes: RouteObject[] = [
               (m) => m.ChildPage,
             ),
           },
+          {
+            path: 'children/:childId/delete',
+            lazy: page(
+              () => import('../features/children/DeleteChildPage'),
+              (m) => m.DeleteChildPage,
+            ),
+          },
+          ...accountRoutes,
           {
             path: 'children/:childId/edit',
             lazy: page(
@@ -127,8 +168,16 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: 'therapist',
-        element: <RoleLayout roleLabel="Therapist" badgeClass="bg-mint-200" home="/therapist" />,
+        element: (
+          <RoleLayout
+            roleLabel="Therapist"
+            badgeClass="bg-mint-200"
+            home="/therapist"
+            account="/therapist/account"
+          />
+        ),
         children: [
+          ...accountRoutes,
           {
             index: true,
             lazy: page(

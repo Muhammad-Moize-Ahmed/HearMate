@@ -122,8 +122,11 @@ function NoteCard({ note, childId, canWrite }: { note: Note; childId: string; ca
   const remove = useDeleteNote(childId);
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const mine = canWrite && note.author.id === principal.id;
-  const author = `${note.author.first_name} ${note.author.last_name}`.trim();
+  const mine = canWrite && note.author?.id === principal.id;
+  // No author: their account was deleted; the note stays with the child.
+  const author = note.author
+    ? `${note.author.first_name} ${note.author.last_name}`.trim()
+    : 'Former therapist';
   const edited = note.updated_at !== note.created_at;
 
   if (editing) {

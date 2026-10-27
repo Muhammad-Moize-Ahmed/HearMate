@@ -17,8 +17,11 @@ export type PrincipalKind = Principal['kind'];
 type TokenOut = components['schemas']['TokenOut'];
 
 export type Session = { accessToken: string; expiresAt: number; principal: Principal };
-/** Why there is no session: never signed in / signed out on purpose, or the sign-in expired. */
-export type EndReason = 'signed-out' | 'expired';
+/**
+ * Why there is no session: never signed in / signed out on purpose, the sign-in expired, or the
+ * account was just deleted.
+ */
+export type EndReason = 'signed-out' | 'expired' | 'deleted';
 
 /** Refresh a little before the token expires rather than wait for a 401. */
 const EXPIRY_MARGIN_MS = 30_000;

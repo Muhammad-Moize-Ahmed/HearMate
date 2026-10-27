@@ -66,8 +66,10 @@ class TherapistNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "therapist_notes"
     __table_args__ = (Index("ix_therapist_notes_child_created", "child_id", "created_at"),)
 
-    therapist_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    # The author. Null once their account is deleted: the note stays with the child's record and
+    # is shown as written by a former therapist.
+    therapist_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     child_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"))
     body: Mapped[str] = mapped_column(Text)

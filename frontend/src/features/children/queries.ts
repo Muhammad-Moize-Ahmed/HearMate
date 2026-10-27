@@ -21,10 +21,11 @@ export function useChildren() {
   return useQuery({ queryKey: childKeys.list, queryFn: () => unwrap(api.GET('/api/children')) });
 }
 
-export function useChild(childId: string) {
+export function useChild(childId: string, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: childKeys.detail(childId),
     queryFn: () => unwrap(api.GET('/api/children/{child_id}', path(childId))),
+    enabled,
   });
 }
 
@@ -63,11 +64,14 @@ export function useUpdateChild(childId: string) {
   });
 }
 
+/** Delete a child for good. The parent's password is asked for again. */
 export function useDeleteChild(childId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => unwrap(api.DELETE('/api/children/{child_id}', path(childId))),
+    mutationFn: (password: string) =>
+      unwrap(api.POST('/api/children/{child_id}/delete', { ...path(childId), body: { password } })),
     onSuccess: () => {
+      // Nothing about the child stays in memory: their profile and every query under it.
       queryClient.removeQueries({ queryKey: childKeys.detail(childId) });
       void queryClient.invalidateQueries({ queryKey: childKeys.list, exact: true });
       void queryClient.invalidateQueries({ queryKey: childKeys.family });

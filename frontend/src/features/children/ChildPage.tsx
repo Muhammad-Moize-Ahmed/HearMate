@@ -1,10 +1,7 @@
-import { useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 
-import { describeError } from '../../api/client';
 import { Alert } from '../../components/ui/Alert';
-import { Button, LinkButton } from '../../components/ui/Button';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { LinkButton } from '../../components/ui/Button';
 import { avatarEmoji } from '../../lib/avatars';
 import { CareTeamSection } from '../careTeam/CareTeamSection';
 import { GoalsSection } from '../goals/GoalsSection';
@@ -13,7 +10,7 @@ import { PlansSection } from '../plans/PlansSection';
 import { ChildLoginCard } from './ChildLoginCard';
 import { BackLink, ChildLoadError, Loading } from './common';
 import { Card, Profile } from './ProfileDetails';
-import { useChild, useDeleteChild, useFamilyProgress, type Child } from './queries';
+import { useChild, useFamilyProgress, type Child } from './queries';
 
 export function ChildPage() {
   const { childId = '' } = useParams();
@@ -126,9 +123,6 @@ function ThisWeek({ childId }: { childId: string }) {
 }
 
 function DeleteChild({ child }: { child: Child }) {
-  const navigate = useNavigate();
-  const remove = useDeleteChild(child.id);
-  const [confirming, setConfirming] = useState(false);
   return (
     <section className="rounded-[2rem] p-5 ring-2 ring-coral-300 sm:p-6">
       <h2 className="mb-2 text-xl font-black">Remove {child.display_name}</h2>
@@ -136,25 +130,9 @@ function DeleteChild({ child }: { child: Child }) {
         Permanently deletes this profile and all of {child.display_name}'s games, progress, goals
         and therapist access. This can't be undone.
       </p>
-      <Button variant="danger" onClick={() => setConfirming(true)}>
-        Delete {child.display_name}'s profile
-      </Button>
-      {confirming && (
-        <ConfirmDialog
-          title={`Delete ${child.display_name}'s profile?`}
-          confirmLabel="Delete forever"
-          typeToConfirm={child.display_name}
-          pending={remove.isPending}
-          error={remove.error && <Alert tone="error">{describeError(remove.error)}</Alert>}
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => remove.mutate(undefined, { onSuccess: () => void navigate('/parent') })}
-        >
-          <p>
-            All of {child.display_name}'s games, progress, badges, goals and sign-in will be deleted
-            for good.
-          </p>
-        </ConfirmDialog>
-      )}
+      <LinkButton to={`/parent/children/${child.id}/delete`} variant="danger">
+        Delete {child.display_name}'s profile…
+      </LinkButton>
     </section>
   );
 }

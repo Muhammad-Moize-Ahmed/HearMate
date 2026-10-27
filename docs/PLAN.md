@@ -272,6 +272,33 @@ new-project/
   - Deploy to a single VM or Render/Railway, with the frontend on Vercel or Netlify.
   - Secrets are set as environment variables on the host only.
 
+### Phase 9b: Account and child deletion (built)
+- **Who can delete what.** Parents delete their account (the whole family) or one child. Therapists delete their
+  account. Admins can't delete accounts, their own included, and stay read-only (only `/admin/stats` counts change).
+  Children can't delete anything.
+- **How.** Deletion is immediate and permanent. A warning page lists what goes, then needs "I understand" plus the
+  password again. A wrong password is 403 `wrong_password` and uses login's lockout; there are also rate limits per
+  account and per IP. Endpoints:
+  - `POST /api/account/delete`;
+  - `POST /api/children/{id}/delete` (this replaced `DELETE /api/children/{id}`);
+  - `GET /api/account/deletion-summary` for the warning page.
+- **What goes.**
+  - Database cascades remove a family's rows in all 19 tables.
+  - A therapist's links and invitations end, but their notes and learning plans stay with the child, shown as
+    written by "Former therapist". This needed a migration: `therapist_notes.therapist_id` became nullable, with
+    `SET NULL` instead of `CASCADE`. Its downgrade refuses to run while such notes exist.
+  - The audit log is cleaned explicitly, because it holds ids as plain strings and IP addresses. A family's rows are
+    deleted, leaving one anonymous `account_deleted` event. A deleted therapist's records of seeing or writing about
+    a child are kept for the family, with no actor and no IP.
+- **Sessions.** Every refresh token is deleted, so every device is signed out at its next request. In the app, the
+  goodbye page ends the session, which clears the query cache and Cache Storage (the build precache stays).
+- **Emails.** The account holder gets a confirmation; a parent gets one when a child is deleted; linked parents are
+  told when their child's therapist leaves. The emails give counts, not children's names. The therapist's name
+  appears only in that last email's body and is never stored.
+- **Tests.** A family with rows in every table is deleted, then every row of every table is scanned as text: the
+  deleted person's ids, email, names, username and IP must appear nowhere, and every table's row count must return
+  to where it was.
+
 ### Ideas carried over from the old code (re-implemented, nothing copied blindly; no secrets)
 - Child-profile field set: `Hearmate/backend/app/db/models.py` (`ChildProfile`).
 - Leveling thresholds and noise SNR values: `Hearmate/backend/app/core/config.py` and `app/services/leveling_service.py`.

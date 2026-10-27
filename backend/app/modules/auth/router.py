@@ -228,6 +228,11 @@ def logout(
     """End this sign-in (every token in its refresh chain) and clear the cookie."""
     service.logout(refresh_token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    clear_refresh_cookie(response, settings)
+    return response
+
+
+def clear_refresh_cookie(response: Response, settings: AppSettings) -> None:
     response.delete_cookie(
         REFRESH_COOKIE,
         path=_refresh_cookie_path(settings),
@@ -235,7 +240,6 @@ def logout(
         secure=settings.refresh_cookie_secure,
         samesite=settings.REFRESH_COOKIE_SAMESITE,
     )
-    return response
 
 
 @router.post("/password/forgot", status_code=status.HTTP_202_ACCEPTED)

@@ -23,6 +23,7 @@ Children play adaptive listening and speech exercises; parents and therapists fo
 | 7d | Progress charts, printable reports, the child's "My progress", route-based code splitting | ✅ done |
 | 7e | Care team (invite/revoke per child), therapist dashboard, notes and learning plans, admin approvals | ✅ done |
 | 8 | PWA and offline: installable app, precached shell, update prompt, offline-safe games and pages | ✅ done |
+| 9b | Account and child deletion: parents (whole family or one child), therapists (notes and plans stay) | ✅ done |
 | 9 | Testing and deployment | ⏳ next |
 
 ## Tech stack
@@ -124,12 +125,16 @@ src/
 | `/verify-email`, `/forgot-password` | signed out | 6-digit emailed codes |
 | `/parent` | parents | dashboard: each child's week (games, minutes, streak) and sign-in status |
 | `/parent/children/new`, `/parent/children/:id/edit` | parents | child profile form |
-| `/parent/children/:id` | parents | the child's week, sign-in (username + PIN), goals, profile, delete |
+| `/parent/children/:id` | parents | the child's week, sign-in (username + PIN), goals, profile, a link to delete the profile |
+| `/parent/children/:id/delete` | parents | what goes, "I understand", the password again; then back to `/parent` with a notice |
 | `/parent/children/:id/progress` (`?range=week\|month\|quarter\|custom&from=&to=`) | parents | charts: scores per skill or game, levels, games per day/week, streaks, goals, badges |
 | `/parent/children/:id/report` (same `?range=`) | parents | the detailed report, laid out to print or save as PDF |
 | `/play` | children | game tiles with the child's level per skill, and their streak |
 | `/play/games/:slug` (`?session=` to resume) | children | the game player: intro, rounds, feedback, results |
 | `/play/progress` | children | "My progress": stars, best games, this week, badges, brothers and sisters this week |
+| `/parent/account`, `/therapist/account` | parents, therapists | name, email, account type; "Delete my account…" (linked as "Account" in the header; not for admins) |
+| `/parent/account/delete`, `/therapist/account/delete` | parents, therapists | what goes (parent) or ends and stays (therapist), "I understand", the password again |
+| `/account-deleted` | anyone | after a deletion: ends the in-memory session, which clears this device's cached data |
 | `/therapist` | therapists | waiting-for-approval state; once approved: invitations (accept / decline) and linked children |
 | `/therapist/children/:id` (`/progress`, `/report`) | approved therapists with an **active** link to that child | learning plan, notes, profile; the same progress and report pages as parents; leave the care team |
 | `/admin` (`?q=&status=`) | admins | counts (accounts, children, recent games), therapists waiting for approval (approve / reject with a reason), therapist accounts with search and status filter |
@@ -142,8 +147,13 @@ src/
   another role's area is sent to its own. Signed-in users skip the sign-in screens.
 - **Children and goals:** forms check the same rules as the backend (e.g. PINs like 1111 or 1234 are refused
   before they're sent). Goal edits send only the fields that changed, so an already-passed due date is kept.
-  Deleting a child, removing their sign-in or deleting a goal asks for confirmation. Deleting a child also asks
-  you to type their name.
+  Removing a child's sign-in or deleting a goal asks for confirmation. Deleting a child has its own page.
+- **Deleting (accounts and children):** permanent, straight away. The page lists what goes, then needs "I understand"
+  and the password again. A wrong password keeps everything (403, not retried). Nothing is sent offline, and nothing
+  is queued. After deleting an account, the goodbye page ends the session, so the query cache and every Cache Storage
+  entry except the build precache are cleared; other tabs and devices are signed out at their next request. After
+  deleting a child, every query about them is removed and they aren't fetched again; the notice names nobody, because
+  browsers keep history state on disk. Notes and plans by a deleted therapist show "Former therapist".
 - **Game player:** the server owns each session; the client only sends answers (`{choice}`, `{sequence}` or a
   recording) and shows what the server decides: right or wrong, points, the level change, streak and new badges.
   The player is a small state machine (`play/playerReducer.ts`). The URL names the session, so a reload picks it

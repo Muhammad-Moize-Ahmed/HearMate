@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/api/account/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Account
+         * @description Delete this account now and for good, then sign out every device.
+         *
+         *     Parent: the account and every child's data. Therapist: the account, links and invitations;
+         *     their notes and learning plans stay with each child, by a former therapist. A wrong password
+         *     is 403 `wrong_password`.
+         */
+        post: operations["delete_account_api_account_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/deletion-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deletion Summary
+         * @description What deleting this account would remove (parent) or end (therapist).
+         */
+        get: operations["deletion_summary_api_account_deletion_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stats": {
         parameters: {
             query?: never;
@@ -328,11 +372,7 @@ export interface paths {
         get: operations["get_child_api_children__child_id__get"];
         put?: never;
         post?: never;
-        /**
-         * Delete Child
-         * @description Permanently deletes the child and all of their data.
-         */
-        delete: operations["delete_child_api_children__child_id__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         /** Update Child */
@@ -353,6 +393,27 @@ export interface paths {
         get: operations["get_achievements_api_children__child_id__achievements_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/children/{child_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Child
+         * @description Permanently delete the child and all of their data. Needs the parent's password again
+         *     (a wrong one is 403 `wrong_password`); the parent is emailed afterwards.
+         */
+        post: operations["delete_child_api_children__child_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1339,6 +1400,14 @@ export interface components {
             /** Choice */
             choice: string;
         };
+        /**
+         * ConfirmPasswordIn
+         * @description The signed-in user's password, asked again before a permanent deletion.
+         */
+        ConfirmPasswordIn: {
+            /** Password */
+            password: string;
+        };
         /** ContrastOut */
         ContrastOut: {
             /** Accuracy */
@@ -1744,7 +1813,8 @@ export interface components {
         };
         /** NoteOut */
         NoteOut: {
-            author: components["schemas"]["AuthorOut"];
+            /** @description Null if that account was deleted */
+            author: components["schemas"]["AuthorOut"] | null;
             /** Body */
             body: string;
             /**
@@ -1781,6 +1851,32 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
+        };
+        /**
+         * ParentDeletionSummaryOut
+         * @description What deleting a parent's account removes, for the warning screen.
+         */
+        ParentDeletionSummaryOut: {
+            /**
+             * Children
+             * @description The children's display names, in name order
+             */
+            children: string[];
+            /**
+             * Games Played
+             * @description Completed games across the family
+             */
+            games_played: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "parent";
+            /**
+             * Therapists
+             * @description Therapists with access to, or invited to, a child
+             */
+            therapists: number;
         };
         /**
          * ParentLinkOut
@@ -2220,6 +2316,32 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * TherapistDeletionSummaryOut
+         * @description What deleting a therapist's account ends, and what stays with the children.
+         */
+        TherapistDeletionSummaryOut: {
+            /**
+             * Learning Plans
+             * @description Plans they started; these stay, by a former therapist
+             */
+            learning_plans: number;
+            /**
+             * Linked Children
+             * @description Children whose care team they are in or invited to
+             */
+            linked_children: number;
+            /**
+             * Notes
+             * @description Notes they wrote; these stay, by a former therapist
+             */
+            notes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "therapist";
+        };
         /** TherapistDetailsIn */
         TherapistDetailsIn: {
             /** License Number */
@@ -2415,6 +2537,57 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    delete_account_api_account_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deletion_summary_api_account_deletion_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentDeletionSummaryOut"] | components["schemas"]["TherapistDeletionSummaryOut"];
+                };
+            };
+        };
+    };
     stats_api_admin_stats_get: {
         parameters: {
             query?: never;
@@ -2962,35 +3135,6 @@ export interface operations {
             };
         };
     };
-    delete_child_api_children__child_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                child_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     update_child_api_children__child_id__patch: {
         parameters: {
             query?: never;
@@ -3045,6 +3189,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AchievementOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_child_api_children__child_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                child_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

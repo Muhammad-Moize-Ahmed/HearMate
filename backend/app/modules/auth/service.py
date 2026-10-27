@@ -155,6 +155,19 @@ class AuthService:
             user.password_hash = new_hash
         return self._complete_user_login(user)
 
+    def confirm_password(self, user: User, password: str) -> None:
+        """Ask a signed-in user for their password again before something irreversible.
+
+        Same lockout as login. A wrong password is 403, not 401: the caller is signed in, and a
+        401 would make the app refresh its token and send the request again.
+        """
+        try:
+            new_hash = self._check_secret(user, password, user.password_hash)
+        except AuthenticationError as exc:
+            raise PermissionDeniedError("That password isn't right", code="wrong_password") from exc
+        if new_hash:
+            user.password_hash = new_hash
+
     def child_login(self, username: str, pin: str) -> IssuedTokens:
         child = self.db.scalar(select(Child).where(Child.username == username))
         if child is None or child.pin_hash is None:

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.passwords import hash_secret
 from app.db.models import (
     AuditLog,
     Child,
@@ -18,7 +19,14 @@ from app.db.models import (
     UserRole,
 )
 from tests.conftest import AuthHeaders
-from tests.factories import DEFAULT_PIN, link_therapist, make_child, make_therapist, make_user
+from tests.factories import (
+    DEFAULT_PASSWORD,
+    DEFAULT_PIN,
+    link_therapist,
+    make_child,
+    make_therapist,
+    make_user,
+)
 
 NEW_CHILD: dict[str, Any] = {
     "display_name": "  Zara ",
@@ -219,7 +227,10 @@ def test_therapists_and_strangers_cannot_edit(
         db_client.patch(url, json={"avatar": "cat"}, headers=auth_headers(stranger)).status_code
         == 404
     )
-    assert db_client.delete(url, headers=auth_headers(stranger)).status_code == 404
+    deleting = db_client.post(
+        f"{url}/delete", json={"password": DEFAULT_PASSWORD}, headers=auth_headers(stranger)
+    )
+    assert deleting.status_code == 404
 
 
 def test_deleting_a_child_removes_their_data(
@@ -229,12 +240,17 @@ def test_deleting_a_child_removes_their_data(
     child: Child,
     auth_headers: AuthHeaders,
 ) -> None:
+    parent.password_hash = hash_secret(DEFAULT_PASSWORD)
     db_session.add(Goal(child_id=child.id, title="Play daily", target_value=7))
     link_therapist(db_session, make_therapist(db_session), child)
     db_session.flush()
     child_id = child.id
 
-    response = db_client.delete(f"/api/children/{child_id}", headers=auth_headers(parent))
+    response = db_client.post(
+        f"/api/children/{child_id}/delete",
+        json={"password": DEFAULT_PASSWORD},
+        headers=auth_headers(parent),
+    )
 
     assert response.status_code == 204
     db_session.expire_all()

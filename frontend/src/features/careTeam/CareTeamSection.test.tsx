@@ -116,6 +116,19 @@ describe('Care team (parent)', () => {
 });
 
 describe('Notes and learning plans (parent)', () => {
+  it('shows notes and plans by a deleted therapist as by a former therapist', async () => {
+    mockParentApi({
+      [`GET /api/children/${CHILD_ID}/learning-plans`]: { body: [planOut({ created_by: null })] },
+      [`GET /api/children/${CHILD_ID}/notes`]: { body: [noteOut({ author: null })] },
+    });
+    renderApp(PAGE);
+
+    const note = (await screen.findByText('Good focus today.')).closest('article')!;
+    expect(within(note).getByText('Former therapist')).toBeInTheDocument();
+    const plan = (await screen.findByText('Listening focus')).closest('article')!;
+    expect(within(plan).getByText(/Started by a former therapist/)).toBeInTheDocument();
+  });
+
   it('reads them without any way to write', async () => {
     mockParentApi({
       [`GET /api/children/${CHILD_ID}/learning-plans`]: { body: [planOut()] },
